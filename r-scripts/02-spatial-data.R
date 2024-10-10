@@ -25,7 +25,6 @@ plot(rotated_raster, main = "Map of Global Sea Surface Temperatures from NOAA",
 
 map("world", add = TRUE, fill = TRUE, col = "black")
 
-
 # Filter for tropical latitudes (23.5°N to 23.5°S)
 library(viridis)
 library(maps)
@@ -71,3 +70,52 @@ plot(sst_temperate_north_rotated, main = "Map of SSTs - Temperate Latitudes",
 library(lattice)
 library(RColorBrewer)
 
+#help from chatgpt making the Map
+library(raster)
+library(viridis)
+library(maps)
+library(ggplot2)
+library(gridExtra)
+library(sp)
+
+# Load the raster data
+raster2 <- raster("data-raw/sst.nc")
+
+# Rotate the raster
+rotated_raster <- rotate(raster2)
+
+# Define the polygons for tropical and temperate regions
+tropical_poly <- Polygon(cbind(c(-180, -180, 180, 180), c(-23.5, 23.5, 23.5, -23.5)))
+tropical_polys <- Polygons(list(tropical_poly), ID = "tropical")
+tropical_sp <- SpatialPolygons(list(tropical_polys))
+
+temperate_poly <- Polygon(cbind(c(-180, -180, 180, 180), c(23.5, 66.5, 66.5, 23.5)))
+temperate_polys <- Polygons(list(temperate_poly), ID = "temperate")
+temperate_sp <- SpatialPolygons(list(temperate_polys))
+
+# Convert the SpatialPolygons to SpatialPolygonsDataFrame
+tropical_spdf <- SpatialPolygonsDataFrame(tropical_sp, data.frame(id = "Tropical", row.names = "tropical"))
+temperate_spdf <- SpatialPolygonsDataFrame(temperate_sp, data.frame(id = "Temperate", row.names = "temperate"))
+
+# Mask the raster with the polygons
+tropical_masked <- mask(rotated_raster, tropical_spdf)
+temperate_masked <- mask(rotated_raster, temperate_spdf)
+
+palette <- viridis(100)
+
+x_limits <- c(-180, 180)
+
+plot(rotated_raster, main = "Map of Global Sea Surface Temperatures from NOAA", 
+     xlab = "Longitude", ylab = "Latitude", col = viridis(100), axes = TRUE, 
+     xlim = x_limits)
+
+# Add the world map
+map("world", add = TRUE, fill = TRUE, col = "black")
+
+# Draw red border around the tropical region
+rect(-180, -23.5, 180, 23.5, border = "red", lwd = 4)
+
+# Draw blue border around the temperate region
+rect(-180, 23.5, 180, 66.5, border = "blue", lwd = 4)
+
+##need to add a legend OUTSIDE the plot - not working
