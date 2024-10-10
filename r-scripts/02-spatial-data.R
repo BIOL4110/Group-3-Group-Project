@@ -51,10 +51,10 @@ plot(sst_temperate_north_rotated, main = "Map of SSTs - Temperate Latitudes",
 library(lattice)
 library(RColorBrewer)
 
-raster2 <- raster("data-raw/sst.wkmean.1990-presentnc")
+raster2 <- raster("data-raw/sst.nc")
 
-print(sst_raster)
+print(raster2)
 
-plot(sst_raster, main = "Map of Global Sea Surface Temperatures from NOAA", 
+plot(raster2, main = "Map of Global Sea Surface Temperatures from NOAA", 
      xlab = "longitude?",
      ylab = "latitude?")
