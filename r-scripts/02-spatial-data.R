@@ -1,4 +1,5 @@
 ## i am now going to attempt spatial data
+# oct - 08 - 2024
 
 #packages
 library(dplyr)
@@ -12,25 +13,44 @@ library(raster) # package for raster manipulation
 library(ggplot2)
 options(stringsAsFactors = FALSE)
 
-sst_raster <- raster("data-raw/oisst-data.nc")
+#load in data
+raster2 <- raster("data-raw/sst.nc")
 
-print(sst_raster)
+print(raster2)
+rotated_raster <- rotate(raster2)
 
-plot(sst_raster, main = "Map of Global Sea Surface Temperatures from NOAA", 
-     xlab = "longitude?",
-     ylab = "latitude?")
-
-# Filter for tropical latitudes (23.5°N to 23.5°S)
-tropical_extent <- extent(-180, 180, -23.5, 23.5)
-sst_tropical <- crop(sst_raster, tropical_extent)
-library(viridis)
-library(maps)
-
-# Plot for tropical latitudes - Most recent 2024/10
-plot(sst_tropical, main = "Map of SSTs - Tropical Latitudes",
+plot(rotated_raster, main = "Map of Global Sea Surface Temperatures from NOAA", 
      xlab = "Longitude", ylab = "Latitude",
      col = viridis(100))
 
+map("world", add = TRUE, fill = TRUE, col = "black")
+
+
+# Filter for tropical latitudes (23.5°N to 23.5°S)
+library(viridis)
+library(maps)
+#rotated to change from 0-360 to -180-180
+
+
+grey_raster <- rotated_raster
+grey_raster[] <- NA
+
+tropical_extent <- extent(-180, 180, -23.5, 23.5)
+mask <- rotated_raster >= -Inf & rotated_raster <= Inf
+
+sst_tropical <- mask(rotated_raster, tropical_extent)
+
+plot(grey_raster, col = "grey", 
+     main = "Map of SSTs - Tropical Latitudes", 
+     xlab = "Longitude", ylab = "Latitude", 
+     xlim = c(-180, 180), 
+     ylim = c(-50, 50))
+
+
+## properly crop the latitude!
+plot(sst_tropical2, main = "Map of SSTs - Tropical Latitudes",
+     xlab = "Longitude", ylab = "Latitude",
+     col = viridis(100))
 map("world", add = TRUE, fill = TRUE, col = "black")
 
 # Filter for temperate latitudes in the Northern Hemisphere (23.5°N to 66.5°N)
@@ -51,10 +71,3 @@ plot(sst_temperate_north_rotated, main = "Map of SSTs - Temperate Latitudes",
 library(lattice)
 library(RColorBrewer)
 
-raster2 <- raster("data-raw/sst.nc")
-
-print(raster2)
-
-plot(raster2, main = "Map of Global Sea Surface Temperatures from NOAA", 
-     xlab = "longitude?",
-     ylab = "latitude?")

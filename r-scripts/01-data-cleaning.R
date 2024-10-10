@@ -27,7 +27,8 @@ temperate_latitudes_df <- studies_data %>%
   select(-biomas, 
          -plot,
          -depth,
-         -sample_desc)
+         -sample_desc,
+         -study_id)
 
 ggplot(temperate_latitudes_df, aes(x = year, y = abundance)) + geom_col() +
   labs(title = "Total Abundance Data over Years in Temperate Latitudes",
@@ -55,11 +56,19 @@ ggplot(tropical_latitudes_df, aes(x = year, y = abundance)) + geom_col() +
 #sep genus and species into separate columns + make new joined on
 trop_df <- tropical_latitudes_df %>%
   separate(genus_species, into = c("genus", "species"), sep = " ", fill = "right") %>%
-  mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_")))
+  mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_"))) %>%
+  mutate(region = "Tropical",
+         year = as.numeric(as.character(year)))
 
 temp_df <- temperate_latitudes_df %>%
   separate(genus_species, into = c("genus", "species"), sep = " ", fill = "right") %>%
-  mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_")))
+  mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_"))) %>%
+  mutate(region = "Temperate",
+         year = as.numeric(as.character(year)))
+
+BioTime_processed <- bind_rows(trop_df, temp_df)
+
+#write_csv(BioTime_processed, "data-processed/BioTime_processed.csv")
 
 ## plotting species richness over time ------
 # tropical biodiversity
@@ -100,8 +109,15 @@ R_trop_fish_div %>%
                formula = y ~ x, parse = TRUE) +
   xlab("Year") +
   ylab("Number of species (R)") +
-  ggtitle("Tropical Fish Species Diversity Over Time") + 
-  theme_classic()
+  ggtitle("B)") + 
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 16),  # Title size
+    axis.title.x = element_text(size = 14), # X-axis label size
+    axis.title.y = element_text(size = 14), # Y-axis label size
+    axis.text.x = element_text(size = 12),  # X-axis text size
+    axis.text.y = element_text(size = 12),  # Y-axis text size
+  )
 
 # temperate biodiversity
 temp_fish_diversity <- temp_df %>%
@@ -121,16 +137,6 @@ R_temp_fish_div <- temp_fish_diversity %>%
   summarise(num_species_present = n_distinct(genus_species))
 
 #plotting species richness in tropical latitudes 
-# HOW DO I ADD SLOPE 
-R_temp_fish_div %>%
-  ggplot(aes(year, num_species_present)) +
-  geom_point() +
-  geom_smooth(method = "lm", color = "darkgreen") +
-  xlab("Year") +
-  ylab("Number of species (R)") +
-  ggtitle("Temperate Fish Species Diversity Over Time") + 
-  theme_classic()
-
 library(ggpmisc)
 
 R_temp_fish_div %>%
@@ -141,8 +147,15 @@ R_temp_fish_div %>%
                formula = y ~ x, parse = TRUE) +  # Add slope and R^2 to the plot
   xlab("Year") +
   ylab("Number of species (R)") +
-  ggtitle("Temperate Fish Species Diversity Over Time") + 
-  theme_classic()
+  ggtitle("A)") + 
+  theme_classic()+
+  theme(
+    plot.title = element_text(size = 16),  # Title size
+    axis.title.x = element_text(size = 14), # X-axis label size
+    axis.title.y = element_text(size = 14), # Y-axis label size
+    axis.text.x = element_text(size = 12),  # X-axis text size
+    axis.text.y = element_text(size = 12),  # Y-axis text size
+  )
 
 ## now add in global therm data ----
 data(trait_glossary)
@@ -173,7 +186,16 @@ cl_gt2 <- cl_gt %>%
 
 #subsetted globTherm data (Tmax, Tmin, lat, long, n) for tropical / temperate latitudes
 tropical_therm <- cl_gt2 %>%
-  filter(lat >= 0 & lat <= 23.5)
+  filter(lat >= 0 & lat <= 23.5) %>%
+  mutate(region = "Tropical")
 
 temperate_therm <- cl_gt2 %>%
-  filter(lat > 23.5 & lat <= 66.5)
+  filter(lat > 23.5 & lat <= 66.5) %>%
+  mutate(region = "Temperate")
+
+# Combine the two data frames by region 
+globTherm_processed <- bind_rows(tropical_therm, temperate_therm)
+
+# csv of filtered globtherm data 
+#write_csv(globTherm_processed, "data-processed/globTherm_processed.csv")
+
