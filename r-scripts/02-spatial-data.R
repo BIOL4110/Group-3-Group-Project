@@ -119,3 +119,7 @@ rect(-180, -23.5, 180, 23.5, border = "red", lwd = 4)
 rect(-180, 23.5, 180, 66.5, border = "blue", lwd = 4)
 
 ##need to add a legend OUTSIDE the plot - not working
+ ## use link when it time
+# https://tmieno2.github.io/R-as-GIS-for-Economists/geom-raster.html
+# where data is downloaded from 
+# https://psl.noaa.gov/data/gridded/data.noaa.oisst.v2.html sst.wakeman.1990-present
