@@ -35,9 +35,12 @@ ggplot(temperate_latitudes_df, aes(x = year, y = abundance)) + geom_col() +
   theme_minimal()
 
 #2001-2010, 
+## fix the years so that they all show 
 tropical_latitudes_df <- studies_data %>%
   filter(latitude >= 0 & latitude <= 23.5) %>%
   filter(!is.na(abundance) & abundance > 0) %>%
+  filter(year >= 2001 & year <= 2010) %>%  # Filter to ensure years are between 2001 and 2010
+  mutate(year = as.factor(year)) %>% 
   select(-biomas, 
          -plot,
          -depth,
@@ -58,7 +61,6 @@ temp_df <- temperate_latitudes_df %>%
   separate(genus_species, into = c("genus", "species"), sep = " ", fill = "right") %>%
   mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_")))
 
-
 ## plotting species richness over time ------
 # tropical biodiversity
 trop_fish_diversity <- trop_df %>%
@@ -78,13 +80,27 @@ R_trop_fish_div <- trop_fish_diversity %>%
   summarise(num_species_present = n_distinct(genus_species))
 
 #plotting species richness in tropical latitudes 
-#factor concentration year + title 
+#fix the year so it properly shows all individual years + add title + make line puprple
 R_trop_fish_div %>%
+  mutate(year = as.numeric(year)) %>%
   ggplot(aes(year, num_species_present)) +
   geom_point() +
   geom_smooth(method = "lm") +
   xlab("Year") +
   ylab("Number of species (R)") +
+  theme_classic()
+
+R_trop_fish_div %>%
+  mutate(year = as.numeric(year)) %>%  
+  ggplot(aes(year, num_species_present)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "purple") +  
+  scale_x_continuous(breaks = seq(min(R_trop_fish_div$year), max(R_trop_fish_div$year), by = 1)) + 
+  stat_poly_eq(aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               formula = y ~ x, parse = TRUE) +
+  xlab("Year") +
+  ylab("Number of species (R)") +
+  ggtitle("Tropical Fish Species Diversity Over Time") + 
   theme_classic()
 
 # temperate biodiversity
@@ -105,13 +121,27 @@ R_temp_fish_div <- temp_fish_diversity %>%
   summarise(num_species_present = n_distinct(genus_species))
 
 #plotting species richness in tropical latitudes 
-#factor concentration year + title + slope
+# HOW DO I ADD SLOPE 
 R_temp_fish_div %>%
   ggplot(aes(year, num_species_present)) +
   geom_point() +
-  geom_smooth(method = "lm") +
+  geom_smooth(method = "lm", color = "darkgreen") +
   xlab("Year") +
   ylab("Number of species (R)") +
+  ggtitle("Temperate Fish Species Diversity Over Time") + 
+  theme_classic()
+
+library(ggpmisc)
+
+R_temp_fish_div %>%
+  ggplot(aes(year, num_species_present)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "darkgreen") +
+  stat_poly_eq(aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               formula = y ~ x, parse = TRUE) +  # Add slope and R^2 to the plot
+  xlab("Year") +
+  ylab("Number of species (R)") +
+  ggtitle("Temperate Fish Species Diversity Over Time") + 
   theme_classic()
 
 ## now add in global therm data ----
