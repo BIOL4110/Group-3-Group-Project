@@ -135,3 +135,30 @@ sst3$Month <- rep(1:12, times = length(1991:2020))
 # https://tmieno2.github.io/R-as-GIS-for-Economists/geom-raster.html
 # where data is downloaded from 
 # https://psl.noaa.gov/data/gridded/data.noaa.oisst.v2.html sst.wakeman.1990-present
+
+
+## ije trying again - this ALMOST worked - where did the files save? idk
+url <- "https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/v2.1/access/avhrr/"
+
+page <- read_html(url)
+
+links <- page %>%
+  html_nodes("a") %>%
+  html_attr("href") %>%
+  grep("\\.nc$", ., value = TRUE)
+
+# Create full URLs
+full_links <- paste0("https://www.ncei.noaa.gov", links)
+
+for (link in full_links) {
+  # Extract the file name
+  file_name <- basename(link)
+  # Download the file
+  download.file(link, file_name, mode = "wb")
+}
+
+library(ncdf4)
+library(raster)
+library(dplyr)
+library(lubridate)
+
