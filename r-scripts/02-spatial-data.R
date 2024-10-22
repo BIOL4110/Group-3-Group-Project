@@ -109,14 +109,26 @@ plot(rotated_raster, main = "Map of Global Sea Surface Temperatures from NOAA",
      xlab = "Longitude", ylab = "Latitude", col = viridis(100), axes = TRUE, 
      xlim = x_limits)
 
-# Add the world map
-map("world", add = TRUE, fill = TRUE, col = "black")
+raster <- as.data.frame(rotated_raster, xy = T, na.rm = T)
 
-# Draw red border around the tropical region
-rect(-180, -23.5, 180, 23.5, border = "red", lwd = 4)
+# Add the world map
+map("world", add = TRUE, fill = TRUE, col = "white")
+
+# Draw red border around the tropical region ## switch .5 of t
+rect(-180, 0, 180, 22, border = "red", lwd = 4)
 
 # Draw blue border around the temperate region
 rect(-180, 23.5, 180, 66.5, border = "blue", lwd = 4)
+
+raster3 <- raster("data-raw/sst.ltm.1991-2020.nc")
+sst3 <- as.data.frame(raster3, xy = T, na.rm = T) ## how to add in years
+
+## added the years but is the data actually correct?
+years <- rep(1991:2020, each = 12)
+
+sst3$Year <- years[1:nrow(sst3)]
+
+sst3$Month <- rep(1:12, times = length(1991:2020))
 
 ##need to add a legend OUTSIDE the plot - not working
  ## use link when it time
