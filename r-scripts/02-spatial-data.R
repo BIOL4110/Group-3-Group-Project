@@ -45,7 +45,7 @@ ggplot() +
   geom_sf(data = observation_coordinates, colour = "red", size = 0.5)
 
 
-#
+#pls
 
 
 
