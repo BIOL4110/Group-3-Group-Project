@@ -3,19 +3,85 @@
 
 source("r-scripts/01-data-cleaning.R")
 
+library(taxadb)
+library(dplyr)
+library(tidyverse)
+library(parallel)
+library(furrr)
+
 ### looking at neha's approach ----
 # https://files.slack.com/files-pri/T0506EF6KLJ-F07P9U7QYH1/taxadb_functions.r
 # Set a timeout longer than 60 seconds in case a database connection fails
-options(timeout = 120)
+options(timeout = 200)
 
 # Load taxonomic databases
 load_databases <- function(){
   td_create("gbif")
-  td_create("itis")
-  td_create("col")
   td_create("slb")
   td_create("fb")
 }
+
+library(taxize)
+
+harmonize_taxonomy <- function(df) {
+  # Harmonize the taxonomy using taxadb
+  harmonized_df <- df %>%
+    mutate(
+      gbif_id = td_resolve(name, db = "gbif"),
+      slb_id = td_resolve(name, db = "slb"),
+      fb_id = td_resolve(name, db = "fb")
+    )
+  
+  return(harmonized_df)
+}
+
+# Harmonize the taxonomy using taxize
+harmonize_taxonomy2 <- function(df) {
+  harmonized_df <- df %>%
+    mutate(
+      gbif_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
+          if (length(res$gbifid) > 0) {
+            return(res$gbifid)
+          } else {
+            return(NA)  # Return NA if no match found
+          }
+        }, error = function(e) {
+          return(NA)  # Handle errors
+        })
+      }),
+      slb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_slbid(name, rows = 1)  # Query SLB for species
+          if (length(res$slbid) > 0) {
+            return(res$slbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      }),
+      fb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_fbid(name, rows = 1)  # Query FishBase for species
+          if (length(res$fbid) > 0) {
+            return(res$fbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      })
+    )
+  
+  return(harmonized_df)
+}
+
+
+harm_biotime <- harmonize_taxonomy2(biotime)
 
 #what were working with
 head(BioTime_processed)
@@ -27,6 +93,7 @@ capitalize <- function(x){
   rest <- tolower(substr(x, start=2, stop=nchar(x)))   # make everything else lowercase
   paste0(first, rest)
 }
+
 ##double check that genus species has the upper and lower case correct spelling + remove any extra characters 
 biotime <- BioTime_processed %>%
   mutate(genus_species = str_replace_all(genus_species, "_", " "), # replace _ with a space
@@ -38,11 +105,58 @@ biotime <- BioTime_processed %>%
          genus_species = sapply(genus_species, capitalize)) # capitalize genus
   #mutate(Scientific_Name = str_to_sentence(Scientific_Name))
 
-head(biotime)
+# Harmonize the taxonomy using taxize
+harmonize_taxonomy2 <- function(df) {
+  harmonized_df <- df %>%
+    mutate(
+      gbif_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
+          if (length(res$gbifid) > 0) {
+            return(res$gbifid)
+          } else {
+            return(NA)  # Return NA if no match found
+          }
+        }, error = function(e) {
+          return(NA)  # Handle errors
+        })
+      }),
+      slb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_slbid(name, rows = 1)  # Query SLB for species
+          if (length(res$slbid) > 0) {
+            return(res$slbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      }),
+      fb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_fbid(name, rows = 1)  # Query FishBase for species
+          if (length(res$fbid) > 0) {
+            return(res$fbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      })
+    )
+  
+  return(harmonized_df)
+}
+
+
+harm_biotime <- harmonize_taxonomy2(biotime)
+
 
 # Input a list of species names to search them in gbif, itis, and col
 # Results in a dataframe that will act as a key for the species in a dataset with corresponding IDs and matching names
-harmonize <- function(names) {
+harmonize <- function(names, time_limit = 120) {
   # Initialize dataframe
   names_db <- data.frame(
     input_name = character(), # names in original dataset
@@ -57,12 +171,79 @@ harmonize <- function(names) {
     genus = character(),
     syn_id = character(),
     syn_name = character(),
+    macthed = character(),
     stringsAsFactors = FALSE
   )
-  
   # Initialize a list to store sp without accepted names found
   not_found <- c()
+  
+  # Loop through the list, begin with searching the name in gbif
+  for (name in names) {
+    gbif <- filter_name(name, "gbif") %>%
+      filter(taxonomicStatus == "accepted")
+    
+    if (nrow(gbif) > 0) { # If there is an accepted match, put this info in the dataframe # nolint: line_length_linter.
+      gbif <- gbif %>%
+        mutate(db = "gbif", input_name = name) %>%
+        dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                      kingdom, phylum, order, class, family, genus) %>%
+        rename(acc_name = scientificName, acc_id = acceptedNameUsageID)
+      
+      names_db <- bind_rows(names_db, gbif)
+      next # If there is no match, go on to next search
+    }
+    return(names_db) 
+  }
+
+syn_not_found <- c()
+
+# Loop through the list, begin with searching the name in gbif
+for (name in not_found) {
+  gbif <- filter_name(name, "gbif") %>%
+    filter(taxonomicStatus == "synonym")
+  
+  if (nrow(gbif) > 0) { # If there is an accepted match, put this info in the dataframe
+    gbif <- gbif %>%
+      mutate(db = "gbif", input_name = name) %>%
+      dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                    kingdom, phylum, order, class, family, genus) %>%
+      rename(syn_name = scientificName, syn_id = acceptedNameUsageID)
+    
+    names_db <- bind_rows(names_db, gbif)
+  } else {  # If no synonym is found, add to dataframe as not matched
+    name_df <- data.frame(input_name = name, matched = "Not Matched", stringsAsFactors = FALSE)
+    names_db <- bind_rows(names_db, name_df)
+  }
 }
+
+return(names_db)  # Return the dataframe with matching status
+}
+
+harmonize_in_batches <- function(sp_list, batch_size = 20) {
+  # Some datasets have 1000s of species, so query the databases a few at a time
+  sp_batches <- split(sp_list, ceiling(seq_along(sp_list) /batch_size))
+  h_batches <- future_map(sp_batches, function(batch) {
+    result <- bind_rows(lapply(batch, harmonize))
+    Sys.sleep(2)
+    return(result)
+  })
+  
+  sp_key <- bind_rows(h_batches)
+  return(sp_key)
+}
+
+species_names_biotime <- unique(biotime$genus_species)
+
+harmonized_biotime_batches <- harmonize_in_batches(species_names_biotime)
+
+# Harmonize species names for both datasets using the harmonize function
+harmonized_biotime <- harmonize(unique(biotime$genus_species))
+harmonized_globTherm <- harmonize(unique(globTherm_processed$genus_species))
+
+# Check the results
+head(harmonized_biotime)
+head(harmonized_globTherm)
+
 
 #mutate(id = get_ids(Scientific_Name, "gbif")
 
