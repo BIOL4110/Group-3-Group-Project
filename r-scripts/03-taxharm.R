@@ -10,22 +10,12 @@ library(parallel)
 library(furrr)
 library(taxize)
 
-
-### looking at neha's approach ----
-# https://files.slack.com/files-pri/T0506EF6KLJ-F07P9U7QYH1/taxadb_functions.r
-# Set a timeout longer than 60 seconds in case a database connection fails
-options(timeout = 200)
-
 # Load taxonomic databases
 load_databases <- function(){
   td_create("gbif")
   td_create("slb")
   td_create("fb")
 }
-
-#what were working with
-head(BioTime_processed)
-head(globTherm_processed)
 
 # Capitalize genus in species name
 capitalize <- function(x){
@@ -34,6 +24,8 @@ capitalize <- function(x){
   paste0(first, rest)
 }
 
+### BIOTIME - Ije  -----
+head(BioTime_processed)
 ##double check that genus species has the upper and lower case correct spelling + remove any extra characters 
 biotime <- BioTime_processed %>%
   mutate(genus_species = str_replace_all(genus_species, "_", " "), # replace _ with a space
@@ -43,9 +35,8 @@ biotime <- BioTime_processed %>%
          genus_species = str_replace_all(genus_species, " spp", ""),
          genus_species = str_squish(genus_species), # remove white spaces
          genus_species = sapply(genus_species, capitalize)) # capitalize genus
-#mutate(Scientific_Name = str_to_sentence(Scientific_Name))
 
-# Harmonize the taxonomy using taxize
+# set function to Harmonize the genus_species column using taxize
 harmonize_taxonomy2 <- function(df) {
   harmonized_df <- df %>%
     mutate(
@@ -90,56 +81,9 @@ harmonize_taxonomy2 <- function(df) {
   return(harmonized_df)
 }
 
-harm_biotime <- harmonize_taxonomy2(biotime)
+##harm_biotime <- harmonize_taxonomy2(biotime) ## full species harmonization -dont run!!
 
-# Harmonize the taxonomy using taxize
-harmonize_taxonomy2 <- function(df) {
-  harmonized_df <- df %>%
-    mutate(
-      gbif_id = sapply(genus_species, function(name) {
-        tryCatch({
-          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
-          if (length(res$gbifid) > 0) {
-            return(res$gbifid)
-          } else {
-            return(NA)  # Return NA if no match found
-          }
-        }, error = function(e) {
-          return(NA)  # Handle errors
-        })
-      }),
-      slb_id = sapply(genus_species, function(name) {
-        tryCatch({
-          res <- get_slbid(name, rows = 1)  # Query SLB for species
-          if (length(res$slbid) > 0) {
-            return(res$slbid)
-          } else {
-            return(NA)
-          }
-        }, error = function(e) {
-          return(NA)
-        })
-      }),
-      fb_id = sapply(genus_species, function(name) {
-        tryCatch({
-          res <- get_fbid(name, rows = 1)  # Query FishBase for species
-          if (length(res$fbid) > 0) {
-            return(res$fbid)
-          } else {
-            return(NA)
-          }
-        }, error = function(e) {
-          return(NA)
-        })
-      })
-    )
-  
-  return(harmonized_df)
-}
-
-harm_biotime <- harmonize_taxonomy2(biotime)
-
-# Batch processing harmonization function
+# Batch processing harmonization function with 
 harmonize_in_batches <- function(df, batch_size = 20) {
   # Split the dataframe into batches
   batches <- split(df, ceiling(seq_along(df$genus_species) / batch_size))
@@ -153,7 +97,7 @@ harmonize_in_batches <- function(df, batch_size = 20) {
     batch <- batches[[i]]
     
     # Harmonize the current batch
-    harmonized_batch <- harmonize_taxonomy(batch)
+    harmonized_batch <- harmonize_taxonomy2(batch)
     
     # Store the result in the list
     results_list[[i]] <- harmonized_batch
@@ -168,10 +112,14 @@ harmonize_in_batches <- function(df, batch_size = 20) {
   return(harmonized_df)
 }
 
-harm_biotime_batches <- harmonize_in_batches(biotime, batch_size = 50)
+harm_biotime_batches <- harmonize_in_batches(biotime, batch_size = 50) ##make size smaller ran for over 10mins
 
+### GLOBTHERM - Celeste ----
+head(globTherm_processed)- c-
 
-# Input a list of species names to search them in gbif, itis, and col
+### looking at neha's approach ----
+# https://files.slack.com/files-pri/T0506EF6KLJ-F07P9U7QYH1/taxadb_functions.r
+# Input a list of species names to search them in gbif
 # Results in a dataframe that will act as a key for the species in a dataset with corresponding IDs and matching names
 harmonize <- function(names, time_limit = 120) {
   # Initialize dataframe
@@ -257,12 +205,5 @@ harmonized_biotime_batches <- harmonize_in_batches(species_names_biotime)
 harmonized_biotime <- harmonize(unique(biotime$genus_species))
 harmonized_globTherm <- harmonize(unique(globTherm_processed$genus_species))
 
-# Check the results
-head(harmonized_biotime)
-head(harmonized_globTherm)
-
-
-#mutate(id = get_ids(Scientific_Name, "gbif")
-
 #inner join to look at how many species overlap between datasets         
-ufish_sp_all_overlap <- inner_join(gl_sp_all, ufish_sp_list, by = "Scientific_Name")
+overlap <- inner_join(gl_sp_all, ufish_sp_list, by = "Scientific_Name")
