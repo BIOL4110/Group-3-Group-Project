@@ -5,7 +5,7 @@
 library(dplyr)
 library(tidyr)
 library(gstat)
-library(rgeos)
+#library(rgeos)
 library(scales)
 library(ncdf4) # package for netcdf manipulation
 library(raster) # package for raster manipulation
@@ -13,11 +13,45 @@ library(raster) # package for raster manipulation
 library(ggplot2)
 options(stringsAsFactors = FALSE)
 
+library(rnaturalearth)
+library(rnaturalearthhires)
+library(rnaturalearthdata)
+library(sf)
+
 #load in data
 raster2 <- raster("data-raw/sst.nc")
 
 print(raster2)
 rotated_raster <- rotate(raster2)
+
+#convert to data frame to allow it to be plotted in ggplot
+df_sst_rast <- as.data.frame(rotated_raster, xy = TRUE)
+
+# Load the countries data
+countries <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Load the observation data
+bio_time <- read.csv("data-processed/BioTime_processed.csv")
+
+# Set the location data to plot on ggplot as spatial data
+observation_coordinates <- st_as_sf(bio_time,coords=c("longitude","latitude"),crs=4326)
+
+# plot in ggplot
+
+ggplot() +
+  geom_raster(data = df_sst_rast , aes(x = x, y = y, fill = Weekly.Mean.of.Sea.Surface.Temperature)) + 
+  coord_sf(crs = crs(rotated_raster)) +
+  geom_sf(data = countries) +
+  geom_sf(data = observation_coordinates, colour = "red", size = 0.5)
+
+
+
+
+
+
+
+
+
 
 plot(rotated_raster, main = "Map of Global Sea Surface Temperatures from NOAA", 
      xlab = "Longitude", ylab = "Latitude",
