@@ -8,6 +8,8 @@ library(dplyr)
 library(tidyverse)
 library(parallel)
 library(furrr)
+library(taxize)
+
 
 ### looking at neha's approach ----
 # https://files.slack.com/files-pri/T0506EF6KLJ-F07P9U7QYH1/taxadb_functions.r
@@ -20,68 +22,6 @@ load_databases <- function(){
   td_create("slb")
   td_create("fb")
 }
-
-library(taxize)
-
-harmonize_taxonomy <- function(df) {
-  # Harmonize the taxonomy using taxadb
-  harmonized_df <- df %>%
-    mutate(
-      gbif_id = td_resolve(name, db = "gbif"),
-      slb_id = td_resolve(name, db = "slb"),
-      fb_id = td_resolve(name, db = "fb")
-    )
-  
-  return(harmonized_df)
-}
-
-# Harmonize the taxonomy using taxize
-harmonize_taxonomy2 <- function(df) {
-  harmonized_df <- df %>%
-    mutate(
-      gbif_id = sapply(genus_species, function(name) {
-        tryCatch({
-          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
-          if (length(res$gbifid) > 0) {
-            return(res$gbifid)
-          } else {
-            return(NA)  # Return NA if no match found
-          }
-        }, error = function(e) {
-          return(NA)  # Handle errors
-        })
-      }),
-      slb_id = sapply(genus_species, function(name) {
-        tryCatch({
-          res <- get_slbid(name, rows = 1)  # Query SLB for species
-          if (length(res$slbid) > 0) {
-            return(res$slbid)
-          } else {
-            return(NA)
-          }
-        }, error = function(e) {
-          return(NA)
-        })
-      }),
-      fb_id = sapply(genus_species, function(name) {
-        tryCatch({
-          res <- get_fbid(name, rows = 1)  # Query FishBase for species
-          if (length(res$fbid) > 0) {
-            return(res$fbid)
-          } else {
-            return(NA)
-          }
-        }, error = function(e) {
-          return(NA)
-        })
-      })
-    )
-  
-  return(harmonized_df)
-}
-
-
-harm_biotime <- harmonize_taxonomy2(biotime)
 
 #what were working with
 head(BioTime_processed)
@@ -103,7 +43,7 @@ biotime <- BioTime_processed %>%
          genus_species = str_replace_all(genus_species, " spp", ""),
          genus_species = str_squish(genus_species), # remove white spaces
          genus_species = sapply(genus_species, capitalize)) # capitalize genus
-  #mutate(Scientific_Name = str_to_sentence(Scientific_Name))
+#mutate(Scientific_Name = str_to_sentence(Scientific_Name))
 
 # Harmonize the taxonomy using taxize
 harmonize_taxonomy2 <- function(df) {
@@ -150,8 +90,85 @@ harmonize_taxonomy2 <- function(df) {
   return(harmonized_df)
 }
 
+harm_biotime <- harmonize_taxonomy2(biotime)
+
+# Harmonize the taxonomy using taxize
+harmonize_taxonomy2 <- function(df) {
+  harmonized_df <- df %>%
+    mutate(
+      gbif_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
+          if (length(res$gbifid) > 0) {
+            return(res$gbifid)
+          } else {
+            return(NA)  # Return NA if no match found
+          }
+        }, error = function(e) {
+          return(NA)  # Handle errors
+        })
+      }),
+      slb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_slbid(name, rows = 1)  # Query SLB for species
+          if (length(res$slbid) > 0) {
+            return(res$slbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      }),
+      fb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_fbid(name, rows = 1)  # Query FishBase for species
+          if (length(res$fbid) > 0) {
+            return(res$fbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      })
+    )
+  
+  return(harmonized_df)
+}
 
 harm_biotime <- harmonize_taxonomy2(biotime)
+
+# Batch processing harmonization function
+harmonize_in_batches <- function(df, batch_size = 20) {
+  # Split the dataframe into batches
+  batches <- split(df, ceiling(seq_along(df$genus_species) / batch_size))
+  
+  # Initialize an empty list to store results
+  results_list <- list()
+  
+  # Loop through each batch
+  for (i in seq_along(batches)) {
+    cat("Processing batch", i, "of", length(batches), "\n")  # To track progress
+    batch <- batches[[i]]
+    
+    # Harmonize the current batch
+    harmonized_batch <- harmonize_taxonomy(batch)
+    
+    # Store the result in the list
+    results_list[[i]] <- harmonized_batch
+    
+    # Optional: Add a delay to avoid API rate limits if needed
+    Sys.sleep(2)
+  }
+  
+  # Combine all batches back into a single dataframe
+  harmonized_df <- do.call(rbind, results_list)
+  
+  return(harmonized_df)
+}
+
+harm_biotime_batches <- harmonize_in_batches(biotime, batch_size = 50)
 
 
 # Input a list of species names to search them in gbif, itis, and col
