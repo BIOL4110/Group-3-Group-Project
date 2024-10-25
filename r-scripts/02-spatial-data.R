@@ -17,6 +17,7 @@ library(rnaturalearth)
 library(rnaturalearthhires)
 library(rnaturalearthdata)
 library(sf)
+library(terra)
 
 #load in data
 raster2 <- raster("data-raw/sst.nc")
@@ -169,3 +170,27 @@ sst3$Month <- rep(1:12, times = length(1991:2020))
 # https://tmieno2.github.io/R-as-GIS-for-Economists/geom-raster.html
 # where data is downloaded from 
 # https://psl.noaa.gov/data/gridded/data.noaa.oisst.v2.html sst.wakeman.1990-present
+
+
+print(raster2)
+rotated_raster <- rotate(raster2)
+
+
+
+#Some code from Jelany
+#load in data
+raster3 <- terra::rast("data-raw/sst1971-2000.nc")
+
+y <- #points sf object
+  
+df <- data.frame()
+
+for (i in seq(1: length(terra::time(raster3)))){
+  
+  #extract values at points at time i
+  month_temp_value <- extract(raster3[[i]],points)
+  
+  #merge the times in the dataframe
+  df <- rbind(df, )
+  
+}
