@@ -112,8 +112,51 @@ harmonize_in_batches <- function(df, batch_size = 20) {
   return(harmonized_df)
 }
 
-harm_biotime_batches <- harmonize_in_batches(biotime, batch_size = 50) ##make size smaller ran for over 10mins
+harm_biotime_batches <- harmonize_in_batches2(biotime, batch_size = 2) ##make size smaller ran for over 1 hour
 
+harmonize_taxonomy3 <- function(df) {
+  harmonized_df <- df %>%
+    mutate(
+      gbif_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
+          if (length(res$gbifid) > 0) {
+            return(res$gbifid)
+          } else {
+            return(NA)  # Return NA if no match found
+          }
+        }, error = function(e) {
+          return(NA)  # Handle errors
+        })
+      })
+    )
+  
+  return(harmonized_df)
+}
+
+harmonize_in_batches2 <- function(df, batch_size = 5) {
+  # Split the dataframe into batches
+  batches <- split(df, ceiling(seq_along(df$genus_species) / batch_size))
+  
+  # Initialize an empty list to store results
+  results_list <- list()
+  
+  # Loop through each batch
+  for (i in seq_along(batches)) {
+    cat("Processing batch", i, "of", length(batches), "\n")  # To track progress
+    batch <- batches[[i]]
+    
+    # Harmonize the current batch
+    harmonized_batch <- harmonize_taxonomy3(batch)
+    
+    # Store the result in the list
+    results_list[[i]] <- harmonized_batch
+    
+    # Optional: Add a delay to avoid API rate limits if needed
+    Sys.sleep(2)
+  }
+}
+  
 ### GLOBTHERM - Celeste ----
 head(globTherm_processed)- c-
 
