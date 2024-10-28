@@ -156,15 +156,70 @@ harmonize_in_batches2 <- function(df, batch_size = 5) {
     Sys.sleep(2)
   }
 }
+
+
+harmonize_taxonomy5 <- function(df) {
+  # Clean up genus_species before processing
+  df <- df %>%
+    mutate(genus_species = str_squish(genus_species))  # Remove extra spaces
   
+  harmonized_df <- df %>%
+    mutate(
+      gbif_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_gbifid(name, rows = 1)  # Query GBIF for species
+          if (length(res$gbifid) > 0) {
+            return(res$gbifid)
+          } else {
+            return(NA)  # Return NA if no match found
+          }
+        }, error = function(e) {
+          return(NA)  # Handle errors
+        })
+      }),
+      slb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_slbid(name, rows = 1)  # Query SLB for species
+          if (length(res$slbid) > 0) {
+            return(res$slbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      }),
+      fb_id = sapply(genus_species, function(name) {
+        tryCatch({
+          res <- get_fbid(name, rows = 1)  # Query FishBase for species
+          if (length(res$fbid) > 0) {
+            return(res$fbid)
+          } else {
+            return(NA)
+          }
+        }, error = function(e) {
+          return(NA)
+        })
+      })
+    )
+  
+  return(harmonized_df)
+}
+
+biotime_preview <- head(biotime, 200)
+
+harm_preview <- harmonize_taxonomy5(biotime_preview)
+##everything returns NA possibly bc of the way the column genus_species has a space between?
+#how is the harmonization code not working based on what is defined and how the genus_species column is laid out?
+
 ### GLOBTHERM - Celeste ----
 head(globTherm_processed)- c-
 
 ### looking at neha's approach ----
 # https://files.slack.com/files-pri/T0506EF6KLJ-F07P9U7QYH1/taxadb_functions.r
-# Input a list of species names to search them in gbif
+# Input a list of species names to search them in gbif, itis, and col
 # Results in a dataframe that will act as a key for the species in a dataset with corresponding IDs and matching names
-harmonize <- function(names, time_limit = 120) {
+harmonize <- function(names) {
   # Initialize dataframe
   names_db <- data.frame(
     input_name = character(), # names in original dataset
@@ -179,9 +234,9 @@ harmonize <- function(names, time_limit = 120) {
     genus = character(),
     syn_id = character(),
     syn_name = character(),
-    macthed = character(),
     stringsAsFactors = FALSE
   )
+  
   # Initialize a list to store sp without accepted names found
   not_found <- c()
   
@@ -200,33 +255,92 @@ harmonize <- function(names, time_limit = 120) {
       names_db <- bind_rows(names_db, gbif)
       next # If there is no match, go on to next search
     }
-    return(names_db) 
-  }
-
-syn_not_found <- c()
-
-# Loop through the list, begin with searching the name in gbif
-for (name in not_found) {
-  gbif <- filter_name(name, "gbif") %>%
-    filter(taxonomicStatus == "synonym")
-  
-  if (nrow(gbif) > 0) { # If there is an accepted match, put this info in the dataframe
-    gbif <- gbif %>%
-      mutate(db = "gbif", input_name = name) %>%
-      dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
-                    kingdom, phylum, order, class, family, genus) %>%
-      rename(syn_name = scientificName, syn_id = acceptedNameUsageID)
     
-    names_db <- bind_rows(names_db, gbif)
-  } else {  # If no synonym is found, add to dataframe as not matched
-    name_df <- data.frame(input_name = name, matched = "Not Matched", stringsAsFactors = FALSE)
-    names_db <- bind_rows(names_db, name_df)
+    slb <- filter_name(name, "slb") %>% # repeat steps by searching slb
+      filter(taxonomicStatus == "accepted")
+    
+    if (nrow(slb) > 0) {
+      slb <- slb %>%
+        mutate(db = "slb", input_name = name) %>%
+        dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                      kingdom, phylum, order, class, family, genus) %>%
+        rename(acc_name = scientificName, acc_id = acceptedNameUsageID)
+      
+      names_db <- bind_rows(names_db, slb)
+      next
+    }
+    
+    fb <- filter_name(name, "fb") %>% # repeat steps by searching fb
+      filter(taxonomicStatus == "accepted")
+    
+    if (nrow(fb) > 0 ) {
+      fb <- fb %>%
+        mutate(db = "fb", input_name = name) %>%
+        dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                      kingdom, phylum, order, class, family, genus) %>%
+        rename(acc_name = scientificName, acc_id = acceptedNameUsageID)
+      
+      names_db <- bind_rows(names_db, fb)
+      next
+    }
+    
+    not_found <- c(not_found, name)
   }
+  
+  syn_not_found <- c()
+  
+  # Loop through the list, begin with searching the name in gbif
+  for (name in not_found) {
+    gbif <- filter_name(name, "gbif") %>%
+      filter(taxonomicStatus == "synonym")
+    
+    if (nrow(gbif) > 0) { # If there is an accepted match, put this info in the dataframe
+      gbif <- gbif %>%
+        mutate(db = "gbif", input_name = name) %>%
+        dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                      kingdom, phylum, order, class, family, genus) %>%
+        rename(syn_name = scientificName, syn_id = acceptedNameUsageID)
+      
+      names_db <- bind_rows(names_db, gbif)
+      next # If there is no match, go on to next search
+    }
+    
+    slb <- filter_name(name, "slb") %>% # repeat steps by searching slb
+      filter(taxonomicStatus == "synonym")
+    
+    if (nrow(slb) > 0) {
+      slb <- slb %>%
+        mutate(db = "slb", input_name = name) %>%
+        dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                      kingdom, phylum, order, class, family, genus) %>%
+        rename(syn_name = scientificName, syn_id = acceptedNameUsageID)
+      
+      names_db <- bind_rows(names_db, slb)
+      next
+    }
+    
+    fb <- filter_name(name, "fb") %>% # repeat steps by searching fb
+      filter(taxonomicStatus == "accepted")
+    
+    if (nrow(fb) > 0 ) {
+      fb <- fb %>%
+        mutate(db = "fb", input_name = name) %>%
+        dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
+                      kingdom, phylum, order, class, family, genus) %>%
+        rename(syn_name = scientificName, syn_id = acceptedNameUsageID)
+      
+      names_db <- bind_rows(names_db, fb)
+      next
+    }
+    name <- data.frame(name) %>% rename(input_name = name)
+    names_db <- bind_rows(names_db, name)
+  }
+  
+  return(names_db) # return the dataframe with the accepted id's and the list of species without matches
 }
+## Error in FUN(left, right) : non-numeric argument to binary operator
 
-return(names_db)  # Return the dataframe with matching status
-}
-
+## error stuff 
 harmonize_in_batches <- function(sp_list, batch_size = 20) {
   # Some datasets have 1000s of species, so query the databases a few at a time
   sp_batches <- split(sp_list, ceiling(seq_along(sp_list) /batch_size))
@@ -246,7 +360,7 @@ harmonized_biotime_batches <- harmonize_in_batches(species_names_biotime)
 
 # Harmonize species names for both datasets using the harmonize function
 harmonized_biotime <- harmonize(unique(biotime$genus_species))
-harmonized_globTherm <- harmonize(unique(globTherm_processed$genus_species))
+
 
 #inner join to look at how many species overlap between datasets         
 overlap <- inner_join(gl_sp_all, ufish_sp_list, by = "Scientific_Name")
