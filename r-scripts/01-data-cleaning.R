@@ -15,6 +15,7 @@ library(janitor)
 library(readr)
 library(tidyverse)
 library(stringr)
+library(dplyr)
 
 studies_data <- read_csv("data-raw/studies_data_ije.csv") %>%
   clean_names()
@@ -40,13 +41,8 @@ ggplot(temperate_latitudes_df, aes(x = year, y = abundance)) + geom_col() +
 tropical_latitudes_df <- studies_data %>%
   filter(latitude >= 0 & latitude <= 23.5) %>%
   filter(!is.na(abundance) & abundance > 0) %>%
-  filter(year >= 2001 & year <= 2010) %>%  # Filter to ensure years are between 2001 and 2010
   mutate(year = as.factor(year)) %>% 
-  select(-biomas, 
-         -plot,
-         -depth,
-         -sample_desc,
-         -study_id)
+  dplyr::select(-biomas, -plot, -depth, -sample_desc, -study_id)
 
 ggplot(tropical_latitudes_df, aes(x = year, y = abundance)) + geom_col() +
   labs(title = "Total Abundance Data over Years in Tropical Latitudes",

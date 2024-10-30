@@ -130,8 +130,11 @@ harm_biotime4 <- harmonize(list4)
 list5 <- subset_biotime[2001:length(subset_biotime)] # from row 2001 : end of the list
 harm_biotime5 <- harmonize(list5)
 
-##NEXT rbind to stack on top FOR HARM
-## left join to biotime by input_name (rename genus_species) - or the column input name is equal to genus sopecies
+##rbind to stack all the dataframes together "on top" of eachother
+harminzed_biotime <- do.call("rbind", list(harm_biotime1, harm_biotime2, harm_biotime3, harm_biotime4, harm_biotime5))
+
+## left join to biotime by input_name (rename genus_species) - or the column input name is equal to genus species
+
 ## then Nehas code to join into biotime - on slack 
 
 
