@@ -54,7 +54,7 @@ harmonize <- function(names) {
     gbif <- filter_name(name, "gbif") %>%
       filter(taxonomicStatus == "accepted")
     
-    if (nrow(gbif) > 0) { # If there is an accepted match, put this info in the dataframe # nolint: line_length_linter.
+    if (nrow(gbif) > 0) { # If there is an accepted match, put this info in the dataframe 
       gbif <- gbif %>%
         mutate(db = "gbif", input_name = name) %>%
         dplyr::select(input_name, db, acceptedNameUsageID, scientificName,
