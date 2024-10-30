@@ -5,7 +5,7 @@ library(ggplot2)
 library(broom)
 
 
-bio_time <- read.csv("BioTime_processed.csv")
+bio_time <- read.csv("data-processed/BioTime_processed.csv")
 
 # Filter data for the two latitude ranges
 df_trop <- bio_time %>% 
