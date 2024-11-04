@@ -131,12 +131,53 @@ list5 <- subset_biotime[2001:length(subset_biotime)] # from row 2001 : end of th
 harm_biotime5 <- harmonize(list5)
 
 ##rbind to stack all the dataframes together "on top" of eachother
-harminzed_biotime <- do.call("rbind", list(harm_biotime1, harm_biotime2, harm_biotime3, harm_biotime4, harm_biotime5))
+harmonized_biotime <- do.call("rbind", list(harm_biotime1, harm_biotime2, harm_biotime3, harm_biotime4, harm_biotime5))
 
-## left join to biotime by input_name (rename genus_species) - or the column input name is equal to genus species
+# Merge dataset with species name key for the purpose of matching with other datasets by ID
+merge_df_with_key <- function(df, df_sp_key) {
+  df_sp_key <- df_sp_key %>% distinct()
+  df_key_merge <- df %>%
+    left_join(df_sp_key, by = c("genus_species" = "input_name"), relationship = "many-to-many") %>%
+    mutate(
+      sp_id = coalesce(acc_id, syn_id, genus_species),
+      sp_name_for_matching = coalesce(acc_name, syn_name, genus_species),
+      match_source = case_when(
+        !is.na(acc_id) ~ "accepted",
+        !is.na(syn_id) ~ "synonym",
+        TRUE ~ "original"
+      )
+    ) %>%
+    select(-acc_name, -syn_name, -acc_id, -syn_id)
+  
+  return(df_key_merge)
+}
 
-## then Nehas code to join into biotime - on slack 
+merged <- merge_df_with_key(biotime, harmonized_biotime)
 
+# returns TRUE,  means both columns contain the same values, regardless of order.
+setequal(merged$genus_species, merged$sp_name_for_matching)
+
+#kingdom: animalia only 
+unique(merged$kingdom)
+
+harmonized_biotime_processed <- merged %>%
+  rename(input_name = genus_species,
+         genus = genus.y,
+        th_genus_species = sp_name_for_matching) %>% #th stands for the taxonomic harmonized species
+  select(-genus.x, -match_source, -kingdom, -db) %>%
+  select(1:4, region, th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
+
+# write_csv(harmonized_biotime_processed, "data-processed/harmonized_biotime.csv")
+
+# compare accuracy in genus species names from th_genus_species and input_name 
+{
+harmonized_biotime_processed2 <- harmonized_biotime_processed %>%
+  mutate(is_match = input_name == th_genus_species)
+
+# calculate accuracy as the proportion of rows where genus_species matches th_genus_species
+accuracy <- mean(harmonized_biotime_processed2$is_match)
+print(paste("Accuracy:", accuracy * 100, "%"))
+  }
 
 ### GLOBTHERM - Celeste ----
 head(globTherm_processed)
