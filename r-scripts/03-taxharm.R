@@ -179,8 +179,64 @@ accuracy <- mean(harmonized_biotime_processed2$is_match)
 print(paste("Accuracy:", accuracy * 100, "%"))
   }
 
-### GLOBTHERM - Celeste ----
-head(globTherm_processed)
+### GLOBTHERM-- Celeste and Mya ----
+library(readr)
+globTherm_processed <- read_csv("data-processed/globTherm_processed.csv")
+
+#Creating new column joining species and genus columns
+globTherm_processed2 <- globTherm_processed %>% 
+  mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_"))) %>%
+  select(-scientific_name_std)
+
+##double check that genus species has the upper and lower case correct spelling + remove any extra characters 
+globtherm <- globTherm_processed2 %>%
+  mutate(genus_species = str_replace_all(genus_species, "_", " "), # replace _ with a space
+         genus_species = str_replace_all(genus_species, "<.*>?>", ""), # remove any <> characters
+         genus_species = str_replace_all(genus_species, "  ", " "),
+         genus_species = str_replace_all(genus_species, " spp.", ""), 
+         genus_species = str_replace_all(genus_species, " spp", ""),
+         genus_species = str_replace_all(genus_species, " sp", ""),
+         genus_species = str_replace_all(genus_species, " sp.", ""),
+         genus_species = str_replace_all(genus_species, " unknown", ""),
+         genus_species = str_squish(genus_species), # remove white spaces
+         genus_species = sapply(genus_species, capitalize)) # capitalize genus
+
+## filters genus_species to select those that have 2 words
+globtherm2 <- globtherm %>% 
+  filter(str_count(genus_species, "\\w+") == 2)
+
+#subset of unique species 
+subset_globtherm <- unique(globtherm2$genus_species) # 1184 unique species names
+
+# harmonize subset_globtherm list in sets 
+list1b <- subset_globtherm[1:500]
+harm_globtherm1 <- harmonize(list1b) ## not working for me 
+
+list2b <- subset_globtherm[501:1000]
+harm_globtherm2 <- harmonize(list2b)
+
+list3b <- subset_globtherm[1001:length(subset_globtherm)] # from row 1001 : end of the list
+harm_globtherm3 <- harmonize(list3b)
+
+##rbind to stack all the dataframes together "on top" of eachother
+harmonized_globtherm <- do.call("rbind", list(harm_globtherm1, harm_globtherm2, harm_globtherm3))
+
+# Merge dataset with species name key for the purpose of matching with other datasets by ID
+mergedb <- merge_df_with_key(globtherm, harmonized_globtherm)
+
+# returns TRUE,  means both columns contain the same values, regardless of order.
+setequal(mergedb$genus_species, mergedb$sp_name_for_matching)
+
+#kingdom: animalia only 
+unique(mergedb$kingdom)
+
+harmonized_globtherm_processed <- mergedb %>%
+  rename(input_name = genus_species,
+         genus = genus.y,
+         th_genus_species = sp_name_for_matching) %>% #th stands for the taxonomic harmonized species
+  select(-genus.x, -match_source, -kingdom, -db) %>%
+  select(1:4, region, th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
+
 
 ## Merging together - Ije -----
 
