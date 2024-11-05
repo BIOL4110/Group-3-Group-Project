@@ -165,3 +165,5 @@ harmonized_globtherm_processed <- mergedb %>%
          th_genus_species = sp_name_for_matching) %>% #th stands for the taxonomic harmonized species
   select(-genus.x, -match_source, -kingdom, -db) %>%
   select(1:4, region, th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
+
+write_csv(harmonized_globtherm_processed, "data-processed/harmonized_globtherm.csv")
