@@ -37,3 +37,5 @@ for (i in seq(1: nrow(pts))){
 pts %>% 
   write.csv("data-processed/BioTime_with_sst.csv")
 
+
+#file source: https://psl.noaa.gov/mddb2/makePlot.html?variableID=156646&fileID=1463649
