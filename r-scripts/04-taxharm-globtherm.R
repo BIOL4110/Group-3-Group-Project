@@ -89,7 +89,7 @@ harmonize <- function(names) {
   return(names_db) # return the dataframe with the accepted id's and the list of species without matches
 }
 
-### Globtherm harmonization -- Celeste and Mya
+### Globtherm harmonization -- Celeste and Mya ----
 library(readr)
 globTherm_processed <- read_csv("data-processed/globTherm_processed.csv")
 View(globTherm_processed)
