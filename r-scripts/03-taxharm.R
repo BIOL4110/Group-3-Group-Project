@@ -92,6 +92,25 @@ harmonize <- function(names) {
   return(names_db) # return the dataframe with the accepted id's and the list of species without matches
 }
 
+# Merge dataset with species name key for the purpose of matching with other datasets by ID
+merge_df_with_key <- function(df, df_sp_key) {
+  df_sp_key <- df_sp_key %>% distinct()
+  df_key_merge <- df %>%
+    left_join(df_sp_key, by = c("genus_species" = "input_name"), relationship = "many-to-many") %>%
+    mutate(
+      sp_id = coalesce(acc_id, syn_id, genus_species),
+      sp_name_for_matching = coalesce(acc_name, syn_name, genus_species),
+      match_source = case_when(
+        !is.na(acc_id) ~ "accepted",
+        !is.na(syn_id) ~ "synonym",
+        TRUE ~ "original"
+      )
+    ) %>%
+    select(-acc_name, -syn_name, -acc_id, -syn_id)
+  
+  return(df_key_merge)
+}
+
 ### BIOTIME - Ije  -----
 head(BioTime_processed)
 ##double check that genus species has the upper and lower case correct spelling + remove any extra characters 
@@ -132,25 +151,6 @@ harm_biotime5 <- harmonize(list5)
 
 ##rbind to stack all the dataframes together "on top" of eachother
 harmonized_biotime <- do.call("rbind", list(harm_biotime1, harm_biotime2, harm_biotime3, harm_biotime4, harm_biotime5))
-
-# Merge dataset with species name key for the purpose of matching with other datasets by ID
-merge_df_with_key <- function(df, df_sp_key) {
-  df_sp_key <- df_sp_key %>% distinct()
-  df_key_merge <- df %>%
-    left_join(df_sp_key, by = c("genus_species" = "input_name"), relationship = "many-to-many") %>%
-    mutate(
-      sp_id = coalesce(acc_id, syn_id, genus_species),
-      sp_name_for_matching = coalesce(acc_name, syn_name, genus_species),
-      match_source = case_when(
-        !is.na(acc_id) ~ "accepted",
-        !is.na(syn_id) ~ "synonym",
-        TRUE ~ "original"
-      )
-    ) %>%
-    select(-acc_name, -syn_name, -acc_id, -syn_id)
-  
-  return(df_key_merge)
-}
 
 merged <- merge_df_with_key(biotime, harmonized_biotime)
 
@@ -209,27 +209,51 @@ globtherm2 <- globtherm %>%
 subset_globtherm <- unique(globtherm2$genus_species) # 1184 unique species names
 
 ##downloaded harmonized ds
-harmonized_globtherm <- read_csv("data-processed/harmonized_globtherm.csv") %>%
-  select(-scientific_name_std)
+harmonized_globtherm <- read_csv("data-processed/harmonized_globtherm.csv") 
 
 # Merge dataset with species name key for the purpose of matching with other datasets by ID
 mergedb <- merge_df_with_key(globtherm, harmonized_globtherm)
 
 # returns TRUE,  means both columns contain the same values, regardless of order.
-setequal(harmonized_globtherm$genus_species, harmonized_globtherm$sp_name_for_matching)
+setequal(mergedb$genus_species, mergedb$sp_name_for_matching)
+
+## merge phylum class order family genus
 
 #kingdom: animalia only 
-unique(mergedb$kingdom)
+mergedb <- mergedb %>%
+  filter(kingdom %in% c("Animalia", NA))
 
-harmonized_globtherm_processed <- mergedb %>%
+#coalasece line up with input name if it = NA or if db is NA 
+mergedb2 <- mergedb %>%
+  mutate(phylum.y = coalesce(phylum.y, phylum.x)) %>%
+  mutate(order.y = coalesce(order.y, order.x)) %>%
+  mutate(class.y = coalesce(class.y, class.x)) %>%
+  mutate(family.y = coalesce(family.y, family.x)) %>%
+  mutate(genus.y = coalesce(genus.y, genus.x)) %>%
+  select(-c(phylum.x, order.x, class.x, family.x, genus.x, db, match_source, kingdom)) 
+
+harmonized_globtherm_processed <- mergedb2 %>%
+  rename_with(~ str_remove(., "\\.y$"), 9:13) %>%
   rename(input_name = genus_species,
-         genus = genus.y,
-         th_genus_species = sp_name_for_matching) %>% #th stands for the taxonomic harmonized species
-  select(-genus.x, -match_source, -kingdom, -db) %>%
-  select(1:4, region, th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
+         th_genus_species = sp_name_for_matching) %>%
+  select(2:7,th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
 
+#write_csv(harmonized_globtherm_processed, "data-processed/harmonized_globtherm.csv")
 
 ## Merging together - Ije -----
+head(harmonized_biotime_processed) # can use this to look at species beta diversity w/o temperature comparison 
+head(harmonized_globtherm_processed) # can look at species ct max w/o species abundance 
 
-#inner join to look at how many species overlap between datasets         
-overlap <- inner_join(gl_sp_all, ufish_sp_list, by = "Scientific_Name")
+#inner join just to look at how many species overlap between datasets         
+overlap <- inner_join(harmonized_biotime_processed, harmonized_globtherm_processed, by = "th_genus_species")
+unique(overlap$th_genus_species) ## 18 unique species between them 
+
+##left join by all the columns that ahve the same name OR by specific columns  
+overlap2 <- inner_join(
+  harmonized_biotime_processed, 
+  harmonized_globtherm_processed, 
+  by = intersect(names(harmonized_biotime_processed), names(harmonized_globtherm_processed))
+)
+
+# only matches up the species and info in columns that match and has information for both 
+#write_csv(overlap2, "data-processed/full_harmonized_btgt.csv")
