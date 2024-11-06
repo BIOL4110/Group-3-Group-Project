@@ -208,24 +208,15 @@ globtherm2 <- globtherm %>%
 #subset of unique species 
 subset_globtherm <- unique(globtherm2$genus_species) # 1184 unique species names
 
-# harmonize subset_globtherm list in sets 
-list1b <- subset_globtherm[1:500]
-harm_globtherm1 <- harmonize(list1b) ## not working for me 
-
-list2b <- subset_globtherm[501:1000]
-harm_globtherm2 <- harmonize(list2b)
-
-list3b <- subset_globtherm[1001:length(subset_globtherm)] # from row 1001 : end of the list
-harm_globtherm3 <- harmonize(list3b)
-
-##rbind to stack all the dataframes together "on top" of eachother
-harmonized_globtherm <- do.call("rbind", list(harm_globtherm1, harm_globtherm2, harm_globtherm3))
+##downloaded harmonized ds
+harmonized_globtherm <- read_csv("data-processed/harmonized_globtherm.csv") %>%
+  select(-scientific_name_std)
 
 # Merge dataset with species name key for the purpose of matching with other datasets by ID
 mergedb <- merge_df_with_key(globtherm, harmonized_globtherm)
 
 # returns TRUE,  means both columns contain the same values, regardless of order.
-setequal(mergedb$genus_species, mergedb$sp_name_for_matching)
+setequal(harmonized_globtherm$genus_species, harmonized_globtherm$sp_name_for_matching)
 
 #kingdom: animalia only 
 unique(mergedb$kingdom)
