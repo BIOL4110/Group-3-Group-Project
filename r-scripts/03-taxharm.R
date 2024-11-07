@@ -238,7 +238,11 @@ harmonized_globtherm_processed <- mergedb2 %>%
          th_genus_species = sp_name_for_matching) %>%
   select(2:7,th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
 
-#write_csv(harmonized_globtherm_processed, "data-processed/harmonized_globtherm.csv")
+harmonized_globtherm_processed %>%
+  filter(phylum == "Chordata")
+
+#write_csv(harmonized_globtherm_processed, "data-processed/harmonized_globtherm2.csv")
+
 
 ## Merging together - Ije -----
 head(harmonized_biotime_processed) # can use this to look at species beta diversity w/o temperature comparison 
