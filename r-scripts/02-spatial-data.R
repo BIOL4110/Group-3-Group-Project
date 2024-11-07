@@ -194,3 +194,77 @@ for (i in seq(1: length(terra::time(raster3)))){
   df <- rbind(df, )
   
 }
+
+
+
+
+
+
+
+
+
+#### Stuart and Jelany's R-script attempting to get temperature data
+library(terra)
+library(sf)
+library(tidyverse)
+library(lubridate)
+library(anytime)
+
+#load weekely mean temperature raster data 
+temp  <- terra::rast("data-raw/sst.mon.mean.nc")
+class(temp)
+
+#load the sf object with the points  
+pts <- read_sf("data-processed/BioTime_processed.csv")
+pts <- pts %>% mutate(latitude = as.numeric(latitude),
+                      longitude = as.numeric(longitude)) 
+
+pts <- pts[1,]
+
+
+
+terra::subset(temp)
+
+# Create a new dataframe that will store our data
+data_container <- data.frame()
+
+# This loop will go through each row in the point data and calculates mean temperature 
+for (i in seq(1: nrow(pts))){
+  
+  # select weekly temperatures that fall within the year of the row
+  y_temp_rasters <- temp[[year(time(temp)) == pts$year[i]]]
+  
+  #convert the locs to a spatvector object
+  locs <- vect(pts[i,], geom = c("latitude", "longitude"))
+  
+  # extract the temperature from all weekly rasters at the location that corresponds to the row  
+  annual_temp_value <- terra::extract(y_temp_rasters,locs)
+  
+  # we can have a look at the weekly values for a given year (it will be weelky or monthly values depending on your dataset)
+  as.numeric(annual_temp_value[1,2:length(annual_temp_value)])
+  
+  # since there are many values, we can't just add them to a dataframe. We have to generate multiple rows, one per value
+  # This code is from: https://www.geeksforgeeks.org/repeat-rows-of-dataframe-n-times-in-r/
+  rows <- do.call("rbind", replicate( 
+    length(annual_temp_value)-1, pts[i,], simplify = FALSE)) 
+  
+  # We can add the weekly values to the rows
+  rows$monthly_mean_sst <- as.numeric(annual_temp_value[1,2:length(annual_temp_value)])
+  
+  # we will also add a column for the time 
+  rows$month <- terra::time( y_temp_rasters)
+  
+  #finally, we can add an ID column, that go from 1 to 2 to 3, and so on...
+  rows$id <- i
+  
+  #We can add our row to our originally emoty dataframe
+  data_container <- rbind(data_container, rows)
+  
+}
+
+
+# We can look at the new dataset
+data_container
+
+
+#https://psl.noaa.gov/mddb2/makePlot.html?variableID=156646&fileID=1463649
