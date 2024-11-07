@@ -221,9 +221,7 @@ pts <- pts %>% mutate(latitude = as.numeric(latitude),
 
 pts <- pts[1,]
 
-
-
-terra::subset(temp)
+terra::values(temp)
 
 # Create a new dataframe that will store our data
 data_container <- data.frame()
