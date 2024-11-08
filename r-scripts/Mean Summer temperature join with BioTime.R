@@ -1,4 +1,4 @@
-#link to sst data download
+#link to sst data download https://psl.noaa.gov/repository/entry/show?entryid=f45cf25c-bde2-44bd-bf3d-c943d92c0dd8
 
 
 library(tidyverse)
