@@ -13,11 +13,14 @@ BioTime <- read_csv("data-processed/BioTime_processed.csv")
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
 
 temp_nc <- nc_open("data-raw/sst.mon.mean.nc")
-print(temp_nc)
 
+#exploring some aspects of the .nc file
+print(temp_nc)
 attributes(temp_nc$var)
 attributes(temp_nc$dim)
 
+
+#extracting variables from the .nc file
 lat <- ncvar_get(temp_nc, "lat")
 
 lon <- ncvar_get(temp_nc, "lon")
@@ -26,7 +29,7 @@ time <- ncvar_get(temp_nc, "time")
 tunits <- ncatt_get(temp_nc, "time", "units")
 #We use this one because our units are in "Days since ..."
 time_obs <- as.Date(time, origin = "1891-01-01", tz = "GMT") 
-#This code would be for "Seconds since ..."
+#This code would be for units in "Seconds since ..."
 #time_obs <- as.POSIXct(time, origin = "1891-01-01", tz = "GMT")
 range(time_obs)
 
@@ -49,9 +52,12 @@ head(sst_obs)
 colnames(sst_obs) <- c("longitude", "latitude", "date","monthly_sst_deg_C")
 head(sst_obs)
 
+
+#filter the data set down to the years we are working with
 sst_obs <- sst_obs %>% 
   filter(year(date) > 1962 & year(date) < 2015)
 
+#reclass columns from "character" class
 sst_obs <- sst_obs %>% 
   mutate(latitude = as.numeric(latitude),
          longitude = as.numeric(longitude),
@@ -59,6 +65,7 @@ sst_obs <- sst_obs %>%
 
 print(sapply(sst_obs,class))
 
+#filter to the area and season
 sst_obs2 <- sst_obs %>% 
   #this line filters to latitudes that we are concerned about
   filter(latitude >= 0 & latitude <= 66.5) %>% 
@@ -66,10 +73,10 @@ sst_obs2 <- sst_obs %>%
   filter(month(date) > 05 & month(date) < 09)
 
 
-#calculate a mean summer sst for each long/lat at a given year
+#calculate a mean summer sst for each long/lat in a given year
 sst_obs3 <- sst_obs2 %>% 
   group_by(latitude, longitude, year(date)) %>% 
-  summarize(mean_summer_sst = mean(monthly_sst_deg_C, na.rm = TRUE)) %>% 
+  summarize(mean_summer_sst_degC = mean(monthly_sst_deg_C, na.rm = TRUE)) %>% 
   ungroup() %>% 
   na.omit()
 
@@ -94,7 +101,10 @@ BioTime_rounded <- BioTime %>%
 print(sapply(BioTime_rounded,class))
 print(sapply(sst_obs3,class))
 
-#join rows from df2 that match df1 based on "ID"
+#We need to convert longitude from a -180 to 180 system into a 0 - 360 system so that it matches the temperature data
+BioTime_rounded$longitude <- ifelse(BioTime_rounded$longitude < 0, BioTime_rounded$longitude + 360, BioTime_rounded$longitude)
+
+#join mean summer ssts from cleaned sst data set that match BioTime based on latitude, longitude, and year
 BioTime_sst <- left_join(BioTime_rounded, sst_obs3, by = c("latitude", "longitude", "year"))
 
 
