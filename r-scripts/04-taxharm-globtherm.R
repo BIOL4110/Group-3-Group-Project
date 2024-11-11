@@ -90,7 +90,7 @@ harmonize <- function(names) {
   return(names_db) # return the dataframe with the accepted id's and the list of species without matches
 }
 
-### Globtherm harmonization -- Celeste and Mya
+### Globtherm harmonization -- Celeste and Mya ----
 library(readr)
 globTherm_processed <- read_csv("data-processed/globTherm_processed.csv")
 View(globTherm_processed)
@@ -166,3 +166,5 @@ harmonized_globtherm_processed <- mergedb %>%
          th_genus_species = sp_name_for_matching) %>% #th stands for the taxonomic harmonized species
   select(-genus.x, -match_source, -kingdom, -db) %>%
   select(1:4, region, th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
+
+write_csv(harmonized_globtherm_processed, "data-processed/harmonized_globtherm.csv")

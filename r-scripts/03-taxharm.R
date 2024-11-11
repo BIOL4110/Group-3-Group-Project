@@ -92,6 +92,25 @@ harmonize <- function(names) {
   return(names_db) # return the dataframe with the accepted id's and the list of species without matches
 }
 
+# Merge dataset with species name key for the purpose of matching with other datasets by ID
+merge_df_with_key <- function(df, df_sp_key) {
+  df_sp_key <- df_sp_key %>% distinct()
+  df_key_merge <- df %>%
+    left_join(df_sp_key, by = c("genus_species" = "input_name"), relationship = "many-to-many") %>%
+    mutate(
+      sp_id = coalesce(acc_id, syn_id, genus_species),
+      sp_name_for_matching = coalesce(acc_name, syn_name, genus_species),
+      match_source = case_when(
+        !is.na(acc_id) ~ "accepted",
+        !is.na(syn_id) ~ "synonym",
+        TRUE ~ "original"
+      )
+    ) %>%
+    select(-acc_name, -syn_name, -acc_id, -syn_id)
+  
+  return(df_key_merge)
+}
+
 ### BIOTIME - Ije  -----
 head(BioTime_processed)
 ##double check that genus species has the upper and lower case correct spelling + remove any extra characters 
@@ -133,25 +152,6 @@ harm_biotime5 <- harmonize(list5)
 ##rbind to stack all the dataframes together "on top" of eachother
 harmonized_biotime <- do.call("rbind", list(harm_biotime1, harm_biotime2, harm_biotime3, harm_biotime4, harm_biotime5))
 
-# Merge dataset with species name key for the purpose of matching with other datasets by ID
-merge_df_with_key <- function(df, df_sp_key) {
-  df_sp_key <- df_sp_key %>% distinct()
-  df_key_merge <- df %>%
-    left_join(df_sp_key, by = c("genus_species" = "input_name"), relationship = "many-to-many") %>%
-    mutate(
-      sp_id = coalesce(acc_id, syn_id, genus_species),
-      sp_name_for_matching = coalesce(acc_name, syn_name, genus_species),
-      match_source = case_when(
-        !is.na(acc_id) ~ "accepted",
-        !is.na(syn_id) ~ "synonym",
-        TRUE ~ "original"
-      )
-    ) %>%
-    select(-acc_name, -syn_name, -acc_id, -syn_id)
-  
-  return(df_key_merge)
-}
-
 merged <- merge_df_with_key(biotime, harmonized_biotime)
 
 # returns TRUE,  means both columns contain the same values, regardless of order.
@@ -179,10 +179,85 @@ accuracy <- mean(harmonized_biotime_processed2$is_match)
 print(paste("Accuracy:", accuracy * 100, "%"))
   }
 
-### GLOBTHERM - Celeste ----
-head(globTherm_processed)
+### GLOBTHERM-- Celeste and Mya ----
+library(readr)
+globTherm_processed <- read_csv("data-processed/globTherm_processed.csv")
+
+#Creating new column joining species and genus columns
+globTherm_processed2 <- globTherm_processed %>% 
+  mutate(genus_species = if_else(is.na(species), genus, paste(genus, species, sep = "_"))) %>%
+  select(-scientific_name_std)
+
+##double check that genus species has the upper and lower case correct spelling + remove any extra characters 
+globtherm <- globTherm_processed2 %>%
+  mutate(genus_species = str_replace_all(genus_species, "_", " "), # replace _ with a space
+         genus_species = str_replace_all(genus_species, "<.*>?>", ""), # remove any <> characters
+         genus_species = str_replace_all(genus_species, "  ", " "),
+         genus_species = str_replace_all(genus_species, " spp.", ""), 
+         genus_species = str_replace_all(genus_species, " spp", ""),
+         genus_species = str_replace_all(genus_species, " sp", ""),
+         genus_species = str_replace_all(genus_species, " sp.", ""),
+         genus_species = str_replace_all(genus_species, " unknown", ""),
+         genus_species = str_squish(genus_species), # remove white spaces
+         genus_species = sapply(genus_species, capitalize)) # capitalize genus
+
+## filters genus_species to select those that have 2 words
+globtherm2 <- globtherm %>% 
+  filter(str_count(genus_species, "\\w+") == 2)
+
+#subset of unique species 
+subset_globtherm <- unique(globtherm2$genus_species) # 1184 unique species names
+
+##downloaded harmonized ds
+harmonized_globtherm <- read_csv("data-processed/harmonized_globtherm.csv") 
+
+# Merge dataset with species name key for the purpose of matching with other datasets by ID
+mergedb <- merge_df_with_key(globtherm, harmonized_globtherm)
+
+# returns TRUE,  means both columns contain the same values, regardless of order.
+setequal(mergedb$genus_species, mergedb$sp_name_for_matching)
+
+## merge phylum class order family genus
+
+#kingdom: animalia only 
+mergedb <- mergedb %>%
+  filter(kingdom %in% c("Animalia", NA))
+
+#coalasece line up with input name if it = NA or if db is NA 
+mergedb2 <- mergedb %>%
+  mutate(phylum.y = coalesce(phylum.y, phylum.x)) %>%
+  mutate(order.y = coalesce(order.y, order.x)) %>%
+  mutate(class.y = coalesce(class.y, class.x)) %>%
+  mutate(family.y = coalesce(family.y, family.x)) %>%
+  mutate(genus.y = coalesce(genus.y, genus.x)) %>%
+  select(-c(phylum.x, order.x, class.x, family.x, genus.x, db, match_source, kingdom)) 
+
+harmonized_globtherm_processed <- mergedb2 %>%
+  rename_with(~ str_remove(., "\\.y$"), 9:13) %>%
+  rename(input_name = genus_species,
+         th_genus_species = sp_name_for_matching) %>%
+  select(2:7,th_genus_species, sp_id, input_name, phylum, order, class, family, genus, species, everything())
+
+harmonized_globtherm_processed %>%
+  filter(phylum == "Chordata")
+
+#write_csv(harmonized_globtherm_processed, "data-processed/harmonized_globtherm2.csv")
+
 
 ## Merging together - Ije -----
+head(harmonized_biotime_processed) # can use this to look at species beta diversity w/o temperature comparison 
+head(harmonized_globtherm_processed) # can look at species ct max w/o species abundance 
 
-#inner join to look at how many species overlap between datasets         
-overlap <- inner_join(gl_sp_all, ufish_sp_list, by = "Scientific_Name")
+#inner join just to look at how many species overlap between datasets         
+overlap <- inner_join(harmonized_biotime_processed, harmonized_globtherm_processed, by = "th_genus_species")
+unique(overlap$th_genus_species) ## 18 unique species between them 
+
+##left join by all the columns that ahve the same name OR by specific columns  
+overlap2 <- inner_join(
+  harmonized_biotime_processed, 
+  harmonized_globtherm_processed, 
+  by = intersect(names(harmonized_biotime_processed), names(harmonized_globtherm_processed))
+)
+
+# only matches up the species and info in columns that match and has information for both 
+#write_csv(overlap2, "data-processed/full_harmonized_btgt.csv")
