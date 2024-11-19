@@ -39,15 +39,17 @@ fillvalue <- ncatt_get(temp_nc,"sst", "parent_stat")
 sst_array[sst_array == fillvalue$value] <- NA
 sst_array
 
-
 lonlattime <- as.matrix(expand.grid(lon,lat,time_obs))
 head(lonlattime)
 
 sst_vec_long <- as.vector(sst_array)
 
+
 #create data.frame
 sst_obs <- data.frame(cbind(lonlattime, sst_vec_long))
 head(sst_obs)
+
+
 #rename columns
 colnames(sst_obs) <- c("longitude", "latitude", "date","monthly_sst_deg_C")
 head(sst_obs)
@@ -57,6 +59,7 @@ head(sst_obs)
 sst_obs <- sst_obs %>% 
   filter(year(date) > 1962 & year(date) < 2015)
 
+
 #reclass columns from "character" class
 sst_obs <- sst_obs %>% 
   mutate(latitude = as.numeric(latitude),
@@ -64,6 +67,7 @@ sst_obs <- sst_obs %>%
          monthly_sst_deg_C = as.numeric(monthly_sst_deg_C))
 
 print(sapply(sst_obs,class))
+
 
 #filter to the area and season
 sst_obs2 <- sst_obs %>% 
@@ -80,6 +84,7 @@ sst_obs3 <- sst_obs2 %>%
   ungroup() %>% 
   na.omit()
 
+
 #rename columns
 colnames(sst_obs3) <- c("latitude", "longitude", "year","mean_summer_sst_degC")
 head(sst_obs3)         
@@ -93,6 +98,12 @@ BioTime %>%
   mutate(latitude = as.numeric(latitude),
          longitude = as.numeric(longitude))
 
+#Duplicate latitude and longitude to retain original values after rounding
+#Will be needed later for full harmonization
+BioTime <- BioTime %>% 
+  mutate(latitude2 = latitude,
+         longitude2 = longitude)
+
 #Here we need to round to the nearest 0.5 in latitude and longitude due to the resolution of the termperature dataset
 BioTime_rounded <- BioTime %>% 
   mutate(latitude = round(latitude*2)/2) %>% 
@@ -105,7 +116,15 @@ print(sapply(sst_obs3,class))
 BioTime_rounded$longitude <- ifelse(BioTime_rounded$longitude < 0, BioTime_rounded$longitude + 360, BioTime_rounded$longitude)
 
 #join mean summer ssts from cleaned sst data set that match BioTime based on latitude, longitude, and year
-BioTime_sst <- left_join(BioTime_rounded, sst_obs3, by = c("latitude", "longitude", "year"))
+BioTime_sst <- left_join(BioTime_rounded, sst_obs3, 
+                         by = c("latitude", "longitude", "year"))
+
+#retain original latitude and longitude values only and relocate to the previous position
+BioTime_sst <- BioTime_sst %>% 
+  select(-latitude,-longitude, -genus_species) %>% 
+  rename(latitude = latitude2,
+         longitude = longitude2) %>% 
+  select(abundance, year, latitude, longitude, genus, species, region, mean_summer_sst_degC)
 
 
 #See dataset without NA values
@@ -115,3 +134,18 @@ BioTime_sst_clean <- BioTime_sst %>%
 
 write_csv(BioTime_sst,"data-processed/BioTime summer sst with NAs.csv")
 write_csv(BioTime_sst_clean, "data-processed/BioTime summer sst without NAs.csv")
+
+
+
+
+#Finally we complete full harmonization with BioTime and GlobTherm
+full_harm_btgt <- read_csv("data-processed/full_harmonized_btgt.csv")
+
+
+#Removing 2 problematic rows that have multiple matches
+BioTime_sst_clean <- BioTime_sst_clean[-c(2556:24557),]
+
+full_harm_all_data <- left_join(full_harm_btgt, BioTime_sst_clean,
+                                by = c("abundance", "year", "latitude", "longitude", "region", "genus", "species"))
+
+write_csv(full_harm_all_data, "data-processed/full_harm_all_data.csv")
