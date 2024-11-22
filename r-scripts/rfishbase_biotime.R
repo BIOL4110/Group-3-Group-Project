@@ -1,3 +1,6 @@
+#
+# Synonym checking will need to make use of synonyms(species_list) from the rfishbase library
+#
 # Load necessary libraries
 library("rfishbase")
 library(readr)
@@ -42,4 +45,3 @@ btfb_without_NA <- btfb_with_NA %>%
 # Save new tables to CSVs
 write.csv(btfb_with_NA, "data-processed/btfb_with_NA.csv", row.names = FALSE)
 write.csv(btfb_without_NA, "data-processed/btfb_without_NA.csv", row.names = FALSE)
-
