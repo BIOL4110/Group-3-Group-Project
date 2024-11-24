@@ -6,7 +6,7 @@ library(dplyr)
 library(lubridate)
 library(ncdf4)
 
-BioTime <- read_csv("data-processed/BioTime_processed.csv")
+
 
 
 #following this article to see what I can achieve 
@@ -87,12 +87,82 @@ sst_obs3 <- sst_obs2 %>%
 
 #rename columns
 colnames(sst_obs3) <- c("latitude", "longitude", "year","mean_summer_sst_degC")
-head(sst_obs3)         
+head(sst_obs3)
 
 
 
 
-#OK now i need to work with the BioTime data to prepare for a join
+#Join with harmonized btfb set (BioTime - Fishbase)
+harm_btfb <- read_csv("data-processed/btfb_without_NA.csv")
+
+harm_btfb %>% 
+  mutate(as_date(year)) %>% 
+  mutate(latitude = as.numeric(latitude),
+         longitude = as.numeric(longitude))
+
+#Duplicate latitude and longitude to retain original values after rounding
+harm_btfb <- harm_btfb %>% 
+  mutate(latitude2 = latitude,
+         longitude2 = longitude)
+
+#Here we need to round to the nearest 0.5 in latitude and longitude due to the resolution of the termperature dataset
+full_harm_rounded <- harm_btfb %>% 
+  mutate(latitude = round(latitude*2)/2) %>% 
+  mutate(longitude = round(longitude*2)/2)
+
+#We need to convert longitude from a -180 to 180 system into a 0 - 360 system so that it matches the temperature data
+full_harm_rounded$longitude <- ifelse(full_harm_rounded$longitude < 0, 
+                                      full_harm_rounded$longitude + 360,
+                                      full_harm_rounded$longitude)
+
+#join mean summer ssts data set that match btgt based on latitude, longitude, and year
+full_harm_btfbsst <- left_join(full_harm_rounded, sst_obs3, 
+                               by = c("latitude", "longitude", "year"))
+
+full_harm_btfbsst_clean <- full_harm_btfbsst %>% 
+  na.omit()
+
+write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
+
+
+
+
+#Join with harmonized btgt set (BioTime - GlobTherm)
+harm_btgt <- read_csv("data-processed/full_harmonized_btgt.csv")
+
+harm_btgt %>% 
+  mutate(as_date(year)) %>% 
+  mutate(latitude = as.numeric(latitude),
+         longitude = as.numeric(longitude))
+
+#Duplicate latitude and longitude to retain original values after rounding
+harm_btgt <- harm_btgt %>% 
+  mutate(latitude2 = latitude,
+         longitude2 = longitude)
+
+#Here we need to round to the nearest 0.5 in latitude and longitude due to the resolution of the termperature dataset
+full_harm_btgt_rounded <- harm_btgt %>% 
+  mutate(latitude = round(latitude*2)/2) %>% 
+  mutate(longitude = round(longitude*2)/2)
+
+#We need to convert longitude from a -180 to 180 system into a 0 - 360 system so that it matches the temperature data
+full_harm_btgt_rounded$longitude <- ifelse(full_harm_btgt_rounded$longitude < 0, 
+                                           full_harm_btgt_rounded$longitude + 360,
+                                           full_harm_btgt_rounded$longitude)
+
+#join mean summer ssts data set that match btgt based on latitude, longitude, and year
+full_harm_btgtsst <- left_join(full_harm_btgt_rounded, sst_obs3, 
+                               by = c("latitude", "longitude", "year"))
+
+full_harm_btgtsst_clean <- full_harm_btgtsst %>% 
+  na.omit()
+
+write_csv(full_harm_all_data, "data-processed/full_harm_all_data.csv")
+
+
+
+
+#Join with BioTime set
 BioTime %>% 
   mutate(as_date(year)) %>% 
   mutate(latitude = as.numeric(latitude),
@@ -137,15 +207,3 @@ write_csv(BioTime_sst_clean, "data-processed/BioTime summer sst without NAs.csv"
 
 
 
-
-#Finally we complete full harmonization with BioTime and GlobTherm
-full_harm_btgt <- read_csv("data-processed/full_harmonized_btgt.csv")
-
-
-#Removing 2 problematic rows that have multiple matches
-BioTime_sst_clean <- BioTime_sst_clean[-c(2556:24557),]
-
-full_harm_all_data <- left_join(full_harm_btgt, BioTime_sst_clean,
-                                by = c("abundance", "year", "latitude", "longitude", "region", "genus", "species"))
-
-write_csv(full_harm_all_data, "data-processed/full_harm_all_data.csv")
