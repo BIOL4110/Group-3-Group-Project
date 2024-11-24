@@ -16,6 +16,8 @@ biotime <- biotime %>%
 # Create species_list from unique values in the species_clean column
 species_list <- unique(biotime$species_clean)
 
+synonyms(species_list) 
+
 # Get table with species occurences
 ecoltbl <- ecology(species_list)
 
