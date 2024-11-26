@@ -123,17 +123,18 @@ lm_temp <- lm(mean_sst ~ year, temp)
 summary(lm_temp)
 
 #Plot yearly mean summer SST
-sum_sst <- ggplot(mean_sst, aes(x = year,
+ggplot(mean_sst, aes(x = year,
                      y = mean_sst,
                      group = region)) +
   geom_point(aes(shape = region, colour = region, size = 5)) +
   scale_color_brewer(palette = "Set2") +
   geom_smooth(method = "lm") +
+  facet_wrap(~region, scales = "free_y") +
   geom_text(aes(x = 1990, y = 26, 
-                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
+                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), #tropical
             color = "black", size = 8) +
   geom_text(aes(x = 1990, y = 19, 
-                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
+                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), # temperate
             color = "black", size = 8) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
@@ -152,8 +153,6 @@ sum_sst <- ggplot(mean_sst, aes(x = year,
 ggsave("Figures/Mean summer SST.png", 
        plot = sum_sst, bg = "transparent",
        width = 20, height = 10, dpi = 300)
-
-
 
 #Join with harmonized btfb set (BioTime - Fishbase)
 harm_btfb <- read_csv("data-processed/btfb_without_NA.csv")

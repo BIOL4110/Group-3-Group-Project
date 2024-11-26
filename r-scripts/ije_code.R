@@ -21,10 +21,10 @@ totalabundance <- b2 %>%
             .groups = "drop")
 
 species_richness <- b2 %>% 
-  group_by(region, year, mean_sst) %>%
+  group_by(region, year) %>%
   summarize(species_richness = n_distinct(species),
             .groups = "drop")
-df2<- left_join(species_richness, totalabundance, by = c("year", "mean_sst", "region"))
+df2<- left_join(species_richness, totalabundance, by = c("year", "region"))
 
 df1 <- left_join(b2,df2, by = c("year", "mean_sst", "region", "genus_species"))
 
@@ -34,9 +34,11 @@ df1 <- left_join(b2,df2, by = c("year", "mean_sst", "region", "genus_species"))
 
 ##  SEA SURFACE TEMPERATURES RISING OVER THE YEARS ----
 ## only summer months
-mean_sst_by_year <- df1 %>%
-  group_by(year) %>%
-  summarize(mean_sst = mean(mean_sst, na.rm = TRUE))
+sst <- read_csv("data-processed/extracted_sst.csv")
+
+mean_sst_by_year <- sst %>%
+  group_by(latitude, longitude, year) %>%
+  summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
 
 ggplot(mean_sst_by_year, aes(x = year, y = mean_sst)) +
   geom_line(color = "blue", linewidth = 1) +
@@ -95,11 +97,40 @@ df1 %>%
       axis.title = element_text(size = 30),      
       legend.position = "none") #+ ggsave("figures/TotalAbundanceOverTimebyRegion.png", width = 20, height = 10, dpi = 300)
 
+# how to display slope line??
+loess_slopes <- df1 %>%
+  filter(total_abundance <= 5000) %>%
+  group_by(region) %>%
+  mutate(loess_model = list(loess(total_abundance ~ as.numeric(as.character(year)))),
+         fitted = predict(loess_model[[1]], se = TRUE)$fit,
+         slope = c(NA, diff(fitted) / diff(as.numeric(as.character(year))))) %>%
+  ungroup()
 
-# WORK ON THIS WITH GROUP
+loess_slopes %>%
+  ggplot(aes(x = as.numeric(as.character(year)), y = total_abundance, color = region, group = region)) + 
+  geom_point(size = 2.5, alpha = 0.7) +
+  geom_smooth(method = "loess", se = FALSE, size = 1.2) + # LOESS smoothing
+  facet_wrap(~region, scales = "free") + 
+  scale_color_brewer(palette = "Set2") +
+  labs(x = "Year", 
+       y = "Total Abundance",
+       color = "Region") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_line(color = "gray80"),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 30), 
+        axis.text = element_text(size = 15), 
+        axis.title = element_text(size = 30),      
+        legend.position = "none") +
+  geom_text(data = loess_slopes %>% group_by(region) %>% summarize(slope_label = paste("Slope:", round(mean(slope, na.rm = TRUE), 2))),
+            aes(x = Inf, y = Inf, label = slope_label),
+            hjust = 1.1, vjust = 1.1, inherit.aes = FALSE)
+
+# WORK ON THIS WITH GROUP ------
 {
-  ## TOTAL ABUNDANCE BY GENUS - HOW ELSE CAN WE ANALYZE THIS?
-  df1 %>%
+## TOTAL ABUNDANCE BY GENUS - HOW ELSE CAN WE ANALYZE THIS?
+df1 %>%
     filter(year >= 2000 & year <= 2010) %>% 
     filter(total_abundance <= 3000) %>% 
     group_by(genus) %>% 
@@ -112,11 +143,12 @@ df1 %>%
     labs(x = "Genus", y = "Total Abundance") +
     theme_minimal(base_size = 14)
   
+## histogram of data
   df1 %>%
     ggplot(aes(x = factor(year), y = species_richness, color = region, group = region)) + 
     geom_point(size = 2.5, alpha = 0.7) +
     geom_smooth(method = "loess") +
-    facet_wrap(~region, scales = "free_y") + 
+    facet_wrap(~region, scales = "free") + 
     scale_color_brewer(palette = "Set2") +
     labs(x = "Year", 
          y = "Species Richnes",
@@ -129,116 +161,41 @@ df1 %>%
           axis.text = element_text(size = 25), 
           axis.title = element_text(size = 30),      
           legend.text = element_text(size = 25)) #+ ggsave("figures/TotalAbundanceOverTimebyRegion.png", width = 20, height = 10, dpi = 300)
+
+  # species richness histogram
+  df1 %>%
+    ggplot(aes(x = species_richness, fill = region)) + 
+    geom_histogram(binwidth = 5, alpha = 0.7, color = "black") + 
+    facet_wrap(~region, scales = "free") + 
+    scale_fill_brewer(palette = "Set2") +
+    labs(x = "Species Richness", 
+         y = "Count",
+         fill = "Region") +
+    theme_minimal(base_size = 14) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          panel.grid.major = element_line(color = "gray80"),
+          panel.grid.minor = element_blank(),
+          text = element_text(size = 30), 
+          axis.text = element_text(size = 25), 
+          axis.title = element_text(size = 30),      
+          legend.text = element_text(size = 25))
   
-# Facet plot for species richness
+ # Facet plot for species richness
 ggplot(df1, aes(x = year, y = species_richness)) +
   geom_point(alpha = 0.5, size = 2) +
   geom_smooth(method = "lm", se = TRUE, color = "blue") +
-  facet_wrap(~ region) +
+  facet_wrap(~ region, scales = "free") +
   theme_minimal() +
-  labs(
-    x = "Year",
+  labs(x = "Year",
     y = "Species Richness",
-    title = "Change in Species Richness Over Time by Region"
-  )
-
-# Facet plot for abundance
-ggplot(df1, aes(x = year, y = abundance)) +
-  geom_point(alpha = 0.5, size = 2) +
-  geom_smooth(method = "lm", se = TRUE, color = "green") +
-  facet_wrap(~ region) +
-  theme_minimal() +
-  labs(
-    x = "Year",
-    y = "Abundance",
-    title = "Change in Abundance Over Time by Region"
-  )
+    title = "Change in Species Richness Over Time by Region")
 
 # Linear model for species richness over time
 #qq residuals is good = normally distributed data 
 richness_model <- lm(species_richness ~ year + mean_sst, data = df1)
-summary(richness_model)
 
-# 1. Linear model for abundance over time
-abundance_model <- lm(abundance ~ year + mean_sst, data = df1)
-summary(abundance_model)
-
-# 2.  Model for abundance trends 
-abundance_model <- lmer(
-  total_abundance ~ year * mean_sst + (1 | genus_species / region),
-  data = df1)
-
-summary(abundance_model) ## consider rescaling
-
-# Extract slopes for each region
-slopes <- a3 %>%
-  group_by(region) %>%
-  summarise(
-    richness_slope = coef(lm(species_richness ~ year))[2],
-    abundance_slope = coef(lm(abundance ~ year))[2]
-  )
-
-print(slopes) ## tropical all negative
-
-# Plot slopes for species richness
-ggplot(slopes, aes(x = region, y = richness_slope)) +
-  geom_bar(stat = "identity", fill = "skyblue") +
-  theme_minimal() +
-  labs(
-    x = "Region",
-    y = "Slope (Species Richness vs. Year)",
-    title = "Trends in Species Richness Over Time by Region"
-  )
-
-# Plot slopes for abundance
-ggplot(slopes, aes(x = region, y = abundance_slope)) +
-  geom_bar(stat = "identity", fill = "lightgreen") +
-  theme_minimal() +
-  labs(
-    x = "Region",
-    y = "Slope (Abundance vs. Year)",
-    title = "Trends in Abundance Over Time by Region"
-  )
-}
-
-# Calculate Jaccard similarity index for each year (presence/absence) + statistically significant 0.05 
-# Jaccard similarity index compares two sets of data to see how similar they are. It might be anywhere between 0 and 1. The greater the number, the closer the two sets of data are
-#
-{
-  trop <- df1 %>%
-    filter(region == "Tropical")
-  
-  temp <- df1 %>%
-    filter(region == "Temperate")
-  
-jaccard_similarity <- function(year) {
-  species_trop <- trop %>% filter(year == !!year) %>% pull(genus_species) %>% unique()
-  species_temp <- temp %>% filter(year == !!year) %>% pull(genus_species) %>% unique()
-  
-  intersection <- length(intersect(species_trop, species_temp))
-  union <- length(union(species_trop, species_temp))
-  
-  if (union == 0) return(NA) else return(intersection / union)
-}
-
-years <- intersect(trop$year, temp$year)
-
-jaccard_indices <- map_dbl(years, jaccard_similarity)
-
-jaccard_results <- data.frame(year = years, jaccard_index = jaccard_indices)
-
-#plot the results of jacaard
-jaccard_results %>% 
-  ggplot(aes(factor(year),jaccard_index)) +
-  geom_point() +
-  geom_smooth(method = lm) +
-  ylab("Jaccard index") + 
-  xlab("Year") +
-  theme_classic()
-
-jaccard_model <- lm(jaccard_index ~ year, data = jaccard_results)
-
-summary(jaccard_model) # statisitcally significant!
+lm1 <- lm(species_richness ~ year + region, data = df1)
+summary(lm1)
 }
 
 # beta diversity (compare temp/tropical regions how similar) - based on abundance data bray-curtis
@@ -250,7 +207,7 @@ beta_diversity <- df1 %>%
   summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
             .groups = "drop") %>%
   drop_na(bc_dist_mean)
-
+  
 beta_diversity %>%
  filter(year >= 1970 & year <= 2010) %>% 
   ggplot(aes(x = factor(year), y = bc_dist_mean, color = region, group = region)) +
@@ -270,39 +227,7 @@ beta_diversity %>%
         legend.position = "none") #+ ggsave("figures/BetaDiversityOverTimebyRegion.png", width = 20, height = 10, dpi = 300)
 
 str(beta_diversity)
-# Perform PCoA
-pcoa <- cmdscale(beta_wide, k = 2, eig = TRUE)
-
-beta_wide <- beta_diversity %>%
-  pivot_wider(names_from = year, values_from = bc_dist_mean, values_fill = list(bc_dist_mean = 0))
-
-# Now, let's calculate pairwise Bray-Curtis distances between regions and years
-# We need the data as a matrix where each row and column corresponds to a specific region-year combination
-
-# Remove the 'region' column to keep only the numeric data
-bc_matrix <- as.matrix(beta_wide[, -1])
-
-# Compute the Bray-Curtis distance matrix
-bc_dist_matrix <- vegdist(bc_matrix, method = "bray")
-
-# Perform PCoA on the distance matrix
-pcoa <- cmdscale(bc_dist_matrix, k = 2, eig = TRUE)
-
-# Create a data frame for plotting
-pcoa_df <- as.data.frame(pcoa$points)
-colnames(pcoa_df) <- c("PC1", "PC2")
-pcoa_df$region <- species_matrix$region
-pcoa_df$year <- species_matrix$year
-
-# PCoA plot FIXXXX
-ggplot(pcoa_df, aes(x = PC1, y = PC2, color = region, shape = factor(year))) +
-  geom_point(size = 3) +
-  theme_minimal() +
-  labs(x = paste("PC1 (", round(pcoa$eig[1] / sum(pcoa$eig) * 100, 1), "%)", sep = ""),
-    y = paste("PC2 (", round(pcoa$eig[2] / sum(pcoa$eig) * 100, 1), "%)", sep = ""),
-    color = "Year",
-    shape = "Region",
-    title = "PCoA of Beta Diversity (Bray-Curtis)")
+# now PCOA
 }
 
 # Calculate Shannon diversity for each group (species richness over time) 
@@ -311,7 +236,6 @@ ggplot(pcoa_df, aes(x = PC1, y = PC2, color = region, shape = factor(year))) +
 shannon_div <- df1 %>%
   group_by(region, year) %>%
   summarise(Shannon = diversity(abundance, index = "shannon"))
-
 
 shannon_div %>% 
 ggplot(aes(x = factor(year), y = Shannon, fill = region)) +
@@ -348,19 +272,9 @@ a3 <- a3 %>%
 
 a3 <- a3 %>%
   mutate(TempMax_filled = ifelse(is.na(TempMax), genus_avg_ctmax, TempMax))
-
-# Scatterplot: Abundance vs. CTmax
-ggplot(a3, aes(x = TempMax_filled, y = abundance)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(method = "lm", color = "red", se = TRUE) +
-  facet_wrap(~region) +
-  theme_minimal() +
-  labs(
-    x = "Thermal Tolerance (CTmax)",
-    y = "Species Abundance",
-    title = "Relationship between CTmax and Species Abundance")
-
-# Linear regression model
-model <- lm(abundance ~ TempMax_filled, data = a3)
-summary(model)
 }
+
+# NEXT STEPS with DF1 ----
+#1. compare species richness and abundance to thermal tolerance 
+#2. complete regressions and other statistical models on change in species richness/abundance over time, with different regions, different species or tmax/tmin
+#3. add slope to beta-diversity plot / species richness plot
