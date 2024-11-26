@@ -127,15 +127,14 @@ sum_sst <- ggplot(mean_sst, aes(x = year,
                      y = mean_sst,
                      group = region)) +
   geom_point(aes(shape = region, colour = region, size = 5)) +
-  scale_colour_manual(values = c("Tropical" = "red",
-                                 "Temperate" = "blue")) +
+  scale_color_brewer(palette = "Set2") +
   geom_smooth(method = "lm") +
   geom_text(aes(x = 1990, y = 26, 
                 label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
-            color = "red", size = 8) +
+            color = "black", size = 8) +
   geom_text(aes(x = 1990, y = 20, 
                 label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
-            color = "blue", size = 8) +
+            color = "black", size = 8) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
   theme_minimal(base_size = 14)+
