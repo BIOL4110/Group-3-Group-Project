@@ -1,5 +1,3 @@
-#THIS IS NOT WORKING YET
-
 library(ggplot2)
 library(rnaturalearth)
 library(rnaturalearthhires)
