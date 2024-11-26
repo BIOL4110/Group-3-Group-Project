@@ -150,7 +150,9 @@ sum_sst <- ggplot(mean_sst, aes(x = year,
          shape = guide_legend(override.aes = list(size = 5))) +
   labs(colour = "Region", shape = "Region")
 
-ggsave("Figures/Mean summer SST.png", plot = sum_sst, bg = "transparent", width = 20, height = 10, dpi = 300)
+ggsave("Figures/Mean summer SST.png", 
+       plot = sum_sst, bg = "transparent",
+       width = 20, height = 10, dpi = 300)
 
 
 

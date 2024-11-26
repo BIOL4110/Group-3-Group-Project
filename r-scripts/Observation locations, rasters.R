@@ -19,19 +19,22 @@ locations <- read.csv("data-processed/btfbsst_without_NA.csv")
 observation_coordinates <- st_as_sf(locations,coords=c("longitude2","latitude2"),crs=4326)
 
 #plot locations on a blank background
-ggplot()+
-  geom_sf(data=countries)+
-  geom_sf(data=observation_coordinates)+
+loc <- ggplot()+
+  geom_sf(data = countries)+
+  geom_sf(data = observation_coordinates, aes(colour = "red"))+
   coord_sf(ylim = c(-0.5,90),
            expand = FALSE) +
-  theme(legend.position="none",
-        panel.grid=element_blank(),
-        axis.title=element_blank(),
-        axis.text=element_text(size = 8),
-        axis.ticks=element_line(colour = "black"),
-        panel.background=element_blank())
+  theme_minimal() +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_text(size = 8),
+        axis.ticks = element_line(colour = "black"),
+        panel.background = element_blank())
 
-
+ggsave("Figures/Location map - blank background.png", 
+       plot = loc, bg = "transparent",
+       width = 20, height = 10, dpi = 300)
 
 
 #RASTER FOR MIDSUMMER (JULY) 1963
@@ -46,7 +49,7 @@ rotated_raster1 <- rotate(raster1)
 df_sst_rast1 <- as.data.frame(rotated_raster1, xy = TRUE)
 head(df_sst_rast1)
 
-ggplot()+
+sixty_three <- ggplot()+
   geom_raster(data = df_sst_rast1, 
               aes(x = x, y = y,
                   fill = Monthly.Means.of.Global.Sea.Surface.Temperature)) +
@@ -56,6 +59,7 @@ ggplot()+
   coord_sf(ylim = c(-0.5,90),
            expand = FALSE) +
   labs(fill = "Mean SST (°C) July 1963") +
+  theme_minimal() +
   theme(legend.position = "right",
         panel.grid = element_blank(),
         axis.title = element_blank(),
@@ -63,6 +67,9 @@ ggplot()+
         axis.ticks = element_line(colour = "black"),
         panel.background = element_blank())
 
+ggsave("Figures/July 1963 raster with locations.png", 
+       plot = sixty_three, bg = "transparent",
+       width = 20, height = 10, dpi = 300)
 
 
 
@@ -78,7 +85,7 @@ rotated_raster2 <- rotate(raster2)
 df_sst_rast2 <- as.data.frame(rotated_raster2, xy = TRUE)
 head(df_sst_rast2)
 
-ggplot()+
+fourteen <- ggplot()+
   geom_raster(data = df_sst_rast2, 
               aes(x = x, y = y,
                   fill = Monthly.Means.of.Global.Sea.Surface.Temperature)) +
@@ -88,6 +95,7 @@ ggplot()+
   coord_sf(ylim = c(-0.5,90),
            expand = FALSE) +
   labs(fill = "Mean SST (°C) July 2014") +
+  theme_minimal() +
   theme(legend.position = "right",
         panel.grid = element_blank(),
         axis.title = element_blank(),
@@ -95,6 +103,10 @@ ggplot()+
         axis.ticks = element_line(colour = "black"),
         panel.background = element_blank())
 
+
+ggsave("Figures/July 2014 raster with locations.png", 
+       plot = fourteen, bg = "transparent",
+       width = 20, height = 10, dpi = 300)
 
 
 
@@ -110,7 +122,7 @@ rotated_raster3 <- rotate(raster3)
 df_sst_rast3 <- as.data.frame(rotated_raster3, xy = TRUE)
 head(df_sst_rast3)
 
-ggplot()+
+twenty_four <- ggplot()+
   geom_raster(data = df_sst_rast3, 
               aes(x = x, y = y,
                   fill = Monthly.Means.of.Global.Sea.Surface.Temperature)) +
@@ -120,9 +132,14 @@ ggplot()+
   coord_sf(ylim = c(-0.5,90),
            expand = FALSE) +
   labs(fill = "Mean SST (°C) July 2024") +
+  theme_minimal() +
   theme(legend.position = "right",
         panel.grid = element_blank(),
         axis.title = element_blank(),
         axis.text = element_text(size = 8),
         axis.ticks = element_line(colour = "black"),
         panel.background = element_blank())
+
+ggsave("Figures/July 2024 raster with locations.png", 
+       plot = twenty_four, bg = "transparent",
+       width = 20, height = 10, dpi = 300)
