@@ -132,7 +132,7 @@ sum_sst <- ggplot(mean_sst, aes(x = year,
   geom_text(aes(x = 1990, y = 26, 
                 label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
             color = "black", size = 8) +
-  geom_text(aes(x = 1990, y = 20, 
+  geom_text(aes(x = 1990, y = 19, 
                 label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
             color = "black", size = 8) +
   xlab("Year") +
