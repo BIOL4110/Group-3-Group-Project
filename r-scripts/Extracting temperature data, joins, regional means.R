@@ -10,8 +10,13 @@ library(ggpmisc)
 
 
 
+
+#DO NOT RUN FROM HERE!!!
 #the following takes a while to run so I have written a .csv file of the finished product
 #please scroll down to work with figures
+
+
+
 
 #following this article to see what I can achieve 
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
@@ -89,7 +94,7 @@ write_csv(sst_obs3,"data-processed/extracted_sst.csv")
 
 
 
-#BEGIN HERE TO WORK WITH FIGURES AND JOINS
+#BEGIN HERE TO WORK WITH FIGURES AND JOINS!!!
 
 
 
