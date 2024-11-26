@@ -77,12 +77,11 @@ cat("The slope of the trend line is:", slope, "°C per year\n")
 
 ## total abundance change over time by region
 df1 %>%
-  filter(year >= 2000 & year <= 2010) %>% 
-  filter(total_abundance <= 20000) %>% # Filter outliers
+  filter(total_abundance <= 5000) %>% # Filter outliers - heighest is 40 000 but are major outliers
   ggplot(aes(x = factor(year), y = total_abundance, color = region, group = region)) + 
   geom_point(size = 2.5, alpha = 0.7) +
   geom_smooth(method = "loess") +
-  facet_wrap(~region, scales = "free_y") + 
+  facet_wrap(~region, scales = "free") + 
   scale_color_brewer(palette = "Set2") +
   labs(x = "Year", 
        y = "Total Abundance",
@@ -92,7 +91,7 @@ df1 %>%
       panel.grid.major = element_line(color = "gray80"),
       panel.grid.minor = element_blank(),
       text = element_text(size = 30), 
-      axis.text = element_text(size = 25), 
+      axis.text = element_text(size = 15), 
       axis.title = element_text(size = 30),      
       legend.position = "none") #+ ggsave("figures/TotalAbundanceOverTimebyRegion.png", width = 20, height = 10, dpi = 300)
 
@@ -204,6 +203,7 @@ ggplot(slopes, aes(x = region, y = abundance_slope)) +
 
 # Calculate Jaccard similarity index for each year (presence/absence) + statistically significant 0.05 
 # Jaccard similarity index compares two sets of data to see how similar they are. It might be anywhere between 0 and 1. The greater the number, the closer the two sets of data are
+#
 {
   trop <- df1 %>%
     filter(region == "Tropical")
@@ -265,12 +265,28 @@ beta_diversity %>%
         panel.grid.major = element_line(color = "gray80"),
         panel.grid.minor = element_blank(),
         text = element_text(size = 30), 
-        axis.text = element_text(size = 20), 
+        axis.text = element_text(size = 15), 
         axis.title = element_text(size = 30),      
         legend.position = "none") #+ ggsave("figures/BetaDiversityOverTimebyRegion.png", width = 20, height = 10, dpi = 300)
 
+str(beta_diversity)
 # Perform PCoA
-pcoa <- cmdscale(beta_diversity, k = 2, eig = TRUE)
+pcoa <- cmdscale(beta_wide, k = 2, eig = TRUE)
+
+beta_wide <- beta_diversity %>%
+  pivot_wider(names_from = year, values_from = bc_dist_mean, values_fill = list(bc_dist_mean = 0))
+
+# Now, let's calculate pairwise Bray-Curtis distances between regions and years
+# We need the data as a matrix where each row and column corresponds to a specific region-year combination
+
+# Remove the 'region' column to keep only the numeric data
+bc_matrix <- as.matrix(beta_wide[, -1])
+
+# Compute the Bray-Curtis distance matrix
+bc_dist_matrix <- vegdist(bc_matrix, method = "bray")
+
+# Perform PCoA on the distance matrix
+pcoa <- cmdscale(bc_dist_matrix, k = 2, eig = TRUE)
 
 # Create a data frame for plotting
 pcoa_df <- as.data.frame(pcoa$points)
@@ -291,21 +307,28 @@ ggplot(pcoa_df, aes(x = PC1, y = PC2, color = region, shape = factor(year))) +
 
 # Calculate Shannon diversity for each group (species richness over time) 
 # Assuming you group data by region and year for diversity calculation
-#FILTER YEAR 
 {
-shannon_div <- a3 %>%
+shannon_div <- df1 %>%
   group_by(region, year) %>%
   summarise(Shannon = diversity(abundance, index = "shannon"))
 
-ggplot(shannon_div, aes(x = factor(year), y = Shannon, fill = region)) +
+
+shannon_div %>% 
+ggplot(aes(x = factor(year), y = Shannon, fill = region)) +
   geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~region, scales = "free") + 
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = "Year",
+       y = "Shannon Diversity Index",
+       fill = "Region")+
   theme_minimal() +
-  labs(
-    x = "Year",
-    y = "Shannon Diversity Index",
-    fill = "Region",
-    title = "Shannon Diversity by Region and Year"
-  )
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_line(color = "gray80"),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 30), 
+        axis.text = element_text(size = 15), 
+        axis.title = element_text(size = 30),      
+        legend.position = "none")#+ ggsave("figures/ShannonDiversitybyRegionandYear.png", width = 20, height = 10, dpi = 300)
 }
 
 # HYPOTHESIS TWO ----
