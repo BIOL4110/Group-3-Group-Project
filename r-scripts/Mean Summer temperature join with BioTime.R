@@ -9,6 +9,10 @@ library(ggplot2)
 library(ggpmisc)
 
 
+
+#the following takes a while to run so I have written a .csv file of the finished product
+#please scroll down to work with figures
+
 #following this article to see what I can achieve 
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
 
@@ -18,7 +22,6 @@ temp_nc <- nc_open("data-raw/sst.mon.mean.nc")
 print(temp_nc)
 attributes(temp_nc$var)
 attributes(temp_nc$dim)
-
 
 #extracting variables from the .nc file
 lat <- ncvar_get(temp_nc, "lat")
@@ -44,21 +47,17 @@ head(lonlattime)
 
 sst_vec_long <- as.vector(sst_array)
 
-
 #create data.frame
 sst_obs <- data.frame(cbind(lonlattime, sst_vec_long))
 head(sst_obs)
-
 
 #rename columns
 colnames(sst_obs) <- c("longitude", "latitude", "date","monthly_sst_deg_C")
 head(sst_obs)
 
-
 #filter the data set down to the years we are working with
 sst_obs <- sst_obs %>% 
   filter(year(date) > 1962 & year(date) < 2025)
-
 
 #reclass columns from "character" class
 sst_obs <- sst_obs %>% 
@@ -68,14 +67,12 @@ sst_obs <- sst_obs %>%
 
 print(sapply(sst_obs,class))
 
-
 #filter to the area and season
 sst_obs2 <- sst_obs %>% 
   #this line filters to latitudes that we are concerned about
   filter(latitude >= 0 & latitude <= 66.5) %>% 
   #this line filters to the summer months (June - August inclusive)
   filter(month(date) > 05 & month(date) < 09)
-
 
 #calculate a mean summer sst for each long/lat in a given year
 sst_obs3 <- sst_obs2 %>% 
@@ -84,13 +81,19 @@ sst_obs3 <- sst_obs2 %>%
   ungroup() %>% 
   na.omit()
 
-
 #rename columns
 colnames(sst_obs3) <- c("latitude", "longitude", "year","mean_summer_sst_degC")
 head(sst_obs3)
 
+write_csv(sst_obs3,"data-processed/extracted_sst.csv")
 
 
+
+#BEGIN HERE TO WORK WITH FIGURES AND JOINS
+
+
+
+sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
 #Find average summer SSTs in the tropical and temperate regions.
 #Looking for trends between 1963 - 2024
@@ -103,23 +106,33 @@ mean_sst <- sst_obs3 %>%
   #calculate mean SST by year in tropical region
   summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
 
+trop <- mean_sst %>% 
+  filter(region == "Tropical")
+temp <- mean_sst %>% 
+  filter(region == "Temperate")
+
+lm_trop <- lm(mean_sst ~ year, trop)
+summary(lm_trop)
+
+lm_temp <- lm(mean_sst ~ year, temp)
+summary(lm_temp)
+
 #Plot yearly mean summer SST
 ggplot(mean_sst, aes(x = year,
                      y = mean_sst,
                      group = region)) +
-  geom_point() +
+  geom_point(aes(shape = region, colour = region)) +
+  scale_colour_manual(values = c("Tropical" = "red",
+                                 "Temperate" = "blue")) +
   geom_smooth(method = "lm") +
-  stat_poly_eq(
-    aes(label = paste(after_stat(eq.label), "  R² = ", 
-                      round(after_stat(adj.r.squared), 3))),
-    formula = y ~ x, 
-    parse = TRUE,
-    size = 4,
-    label.x = 1990,  # Adjust the x position of the label (try to adjust to where it fits)
-    label.y = 30) +  # Adjust the y position of the label (make sure it fits in the plot)
+  geom_text(aes(x = 1990, y = 26, 
+                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.005"), 
+            color = "red", size = 4) +
+  geom_text(aes(x = 1990, y = 20, 
+                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.005"), 
+            color = "blue", size = 4) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
-  facet_grid(.~ region) +
   theme_classic()
 
 
