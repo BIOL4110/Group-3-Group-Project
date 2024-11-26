@@ -5,8 +5,8 @@ library(tidyverse)
 library(dplyr)
 library(lubridate)
 library(ncdf4)
-
-
+library(ggplot2)
+library(ggpmisc)
 
 
 #following this article to see what I can achieve 
@@ -57,7 +57,7 @@ head(sst_obs)
 
 #filter the data set down to the years we are working with
 sst_obs <- sst_obs %>% 
-  filter(year(date) > 1962 & year(date) < 2015)
+  filter(year(date) > 1962 & year(date) < 2025)
 
 
 #reclass columns from "character" class
@@ -88,6 +88,39 @@ sst_obs3 <- sst_obs2 %>%
 #rename columns
 colnames(sst_obs3) <- c("latitude", "longitude", "year","mean_summer_sst_degC")
 head(sst_obs3)
+
+
+
+
+#Find average summer SSTs in the tropical and temperate regions.
+#Looking for trends between 1963 - 2024
+
+mean_sst <- sst_obs3 %>% 
+  #creat column identifying regions by latitude
+  mutate(region = case_when(latitude >= 0 & latitude <= 23.5 ~ "Tropical",
+                            latitude > 23.5 ~ "Temperate")) %>% 
+  group_by(year, region) %>% 
+  #calculate mean SST by year in tropical region
+  summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
+
+#Plot yearly mean summer SST
+ggplot(mean_sst, aes(x = year,
+                     y = mean_sst,
+                     group = region)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_poly_eq(
+    aes(label = paste(after_stat(eq.label), "  R² = ", 
+                      round(after_stat(adj.r.squared), 3))),
+    formula = y ~ x, 
+    parse = TRUE,
+    size = 4,
+    label.x = 1990,  # Adjust the x position of the label (try to adjust to where it fits)
+    label.y = 30) +  # Adjust the y position of the label (make sure it fits in the plot)
+  xlab("Year") +
+  ylab("Mean SST (°C)") +
+  facet_grid(.~ region) +
+  theme_classic()
 
 
 
@@ -124,6 +157,15 @@ full_harm_btfbsst_clean <- full_harm_btfbsst %>%
 
 write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
 
+
+
+
+
+
+
+
+#The remaining code is unused for our project.
+#We chose to work with the BioTime and Fishbase data.
 
 
 
