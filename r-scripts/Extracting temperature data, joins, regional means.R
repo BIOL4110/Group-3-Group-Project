@@ -131,10 +131,10 @@ ggplot(mean_sst, aes(x = year,
                                  "Temperate" = "blue")) +
   geom_smooth(method = "lm") +
   geom_text(aes(x = 1990, y = 26, 
-                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.005"), 
+                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
             color = "red", size = 4) +
   geom_text(aes(x = 1990, y = 20, 
-                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.005"), 
+                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
             color = "blue", size = 4) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
