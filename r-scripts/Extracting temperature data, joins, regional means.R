@@ -138,7 +138,13 @@ ggplot(mean_sst, aes(x = year,
             color = "blue", size = 4) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
-  theme_classic()
+  theme_minimal() +
+  theme(panel.grid.major = element_line(color = "gray80"),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 12), 
+        axis.text = element_text(size = 10), 
+        axis.title = element_text(size = 12),      
+        legend.position = "none")
 
 
 
