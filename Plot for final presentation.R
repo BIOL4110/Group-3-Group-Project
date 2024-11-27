@@ -41,7 +41,7 @@ top_species <- data %>%
 filtered_data <- data %>%
   filter(genus_species %in% top_species)
 
-filtered_data <- data %>%
+filtered_data <- filtered_data %>%
   mutate(genus_species = str_replace_all(genus_species, "_", " "))
 
 # Create the violin with scatter
@@ -68,7 +68,7 @@ final_plot <- map_plot / violin_plot +
 # Display the final plot
 print(final_plot)
 
-ggsave("Figures/Plot.png", 
+ggsave("Figures/Plot-limited.species.png", 
        plot = final_plot, 
        width = 12, 
        height = 8, 
