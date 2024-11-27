@@ -8,288 +8,311 @@ library(janitor)
 library(readr)
 library(stringr)
 library(lme4)
+library(ggpmisc)
 
-# START HERE ----
+# SETUP ----
 b <- read_csv("data-processed/btfbsst_without_NA.csv")
 
 b2 <- rename(b, mean_sst = mean_summer_sst_degC) %>%
   mutate(mean_sst = round(mean_sst, digits = 2))
 
-species_richness <- b2 %>%
-  group_by(region, year, mean_sst) %>%
-  summarize(species_richness = n_distinct(species),
-            total_abundance = sum(abundance),
+totalabundance <- b2 %>%
+  group_by(region, year, mean_sst, genus_species) %>%
+  summarize(total_abundance = sum(abundance),
             .groups = "drop")
 
-df1 <- left_join(b2, species_richness, by = c("year", "mean_sst", "region"))
-#cross refence genus_species by fishbase_name - not all match so how do we fix?
+species_richness <- b2 %>% 
+  group_by(region, year) %>%
+  summarize(species_richness = n_distinct(species),
+            .groups = "drop")
+df2<- left_join(species_richness, totalabundance, by = c("year", "region"))
+
+df1 <- left_join(b2,df2, by = c("year", "mean_sst", "region", "genus_species"))
+
+#cross reference genus_species by fishbase_name - not all match so how do we fix?
 ## is it false bc it has an underscore - check 
 
-##  SEA SURFACE TEMPERATURES RISING OVER THE YEARS ----
+
+##  SEA SURFACE TEMPERATURES RISING OVER THE YEARS - done ----
 ## only summer months
-mean_sst_by_year <- df1 %>%
-  group_by(year) %>%
-  summarize(mean_sst = mean(mean_sst, na.rm = TRUE))
-
-ggplot(mean_sst_by_year, aes(x = year, y = mean_sst)) +
-  geom_line(color = "blue", linewidth = 1) +
-  geom_point(color = "red") +
-  labs(title = "Mean Sea Surface Temperature Over the Years",
-    x = "Year",
-    y = "Mean SST (°C)") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))
-
-## matching the species data - but can we also do up to 2024
-ggplot(mean_sst_by_year, aes(x = year, y = mean_sst)) +
-  geom_line(color = "blue", size = 1) +
-  geom_point(color = "red") +
-  geom_smooth(method = "lm", color = "darkgreen", linetype = "dashed") +
-  labs(
-    title = "Mean Sea Surface Temperature Over the Years (with Trendline)",
-    x = "Year",
-    y = "Mean SST (°C)"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))
-
-sst_trend_model <- lm(mean_sst ~ year, data = mean_sst_by_year)
+sst_trend_model <- lm(mean_sst ~ year, data = mean_sst)
 summary(sst_trend_model)
 
 # Extract the slope (coefficient of year)
 slope <- coef(sst_trend_model)["year"]
 cat("The slope of the trend line is:", slope, "°C per year\n")
-#positive slope od 0.213C per year - temp increasing that much every year 
+#positive slope of 0.01C per year - temp increasing that much every year 
 
-# HYPOTHESIS ONE ----
-# facetwrap over years how it is changing over years 
-## fit slopes with models of species richness /abundance overtime 
-#fishbase merged with biotime  - has species clean been run through harmonization?
+#stuarts data
+sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
-## total abundance change over time by region ## crop out before 2000
-df1 %>%
-  filter(year > 2000) %>% 
-  ggplot(aes(x = year, y = total_abundance, color = region)) +
-  geom_line() +
-  labs(title = "Total Abundance Over Time by Region",
-       x = "Year", y = "Total Abundance") +
-  theme_minimal(base_size = 14)
+mean_sst <- sst_obs3 %>% 
+  #creat column identifying regions by latitude
+  mutate(region = case_when(latitude >= 0 & latitude <= 23.5 ~ "Tropical",
+                            latitude > 23.5 ~ "Temperate")) %>% 
+  group_by(year, region) %>% 
+  #calculate mean SST by year in tropical region
+  summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
 
-# specis richness by region 
-ggplot(df1, aes(x = region, y = species_richness, fill = region)) +
-  geom_boxplot() +
-  labs(title = "Species Richness by Region",
-       x = "Region", y = "Species Richness") +
-  theme_minimal(base_size = 14) +
-  scale_fill_brewer(palette = "Set3")
-
-# Summarize the data by year - FILTER HERE TO ONLY LOOK AT 2000-2010
-{
-yearly_summary <- a3 %>%
-  group_by(year) %>%
-  summarise(
-    mean_species_richness = mean(species_richness, na.rm = TRUE),
-    total_abundance = sum(abundance, na.rm = TRUE)
-  )
-
-# Facet plot for species richness
-ggplot(a3, aes(x = year, y = species_richness)) +
-  geom_point(alpha = 0.5, size = 2) +
-  geom_smooth(method = "lm", se = TRUE, color = "blue") +
-  facet_wrap(~ region) +
-  theme_minimal() +
-  labs(
-    x = "Year",
-    y = "Species Richness",
-    title = "Change in Species Richness Over Time by Region"
-  )
-
-# Facet plot for abundance
-ggplot(a3, aes(x = year, y = abundance)) +
-  geom_point(alpha = 0.5, size = 2) +
-  geom_smooth(method = "lm", se = TRUE, color = "green") +
-  facet_wrap(~ region) +
-  theme_minimal() +
-  labs(
-    x = "Year",
-    y = "Abundance",
-    title = "Change in Abundance Over Time by Region"
-  )
-
-
-
-
-# Linear model for species richness over time
-#qq residuals is good = normally distributed data 
-richness_model <- lm(species_richness ~ year + mean_sst, data = df1)
-summary(richness_model)
-
-# 1. Linear model for abundance over time
-abundance_model <- lm(abundance ~ year + mean_sst, data = df1)
-summary(abundance_model)
-
-# 2.  Model for abundance trends 
-abundance_model <- lmer(
-  total_abundance ~ year * mean_sst + (1 | genus_species / region),
-  data = df1)
-
-summary(abundance_model) ## consider rescaling
-
-# Extract slopes for each region
-slopes <- a3 %>%
-  group_by(region) %>%
-  summarise(
-    richness_slope = coef(lm(species_richness ~ year))[2],
-    abundance_slope = coef(lm(abundance ~ year))[2]
-  )
-
-print(slopes) ## tropical all negative
-
-# Plot slopes for species richness
-ggplot(slopes, aes(x = region, y = richness_slope)) +
-  geom_bar(stat = "identity", fill = "skyblue") +
-  theme_minimal() +
-  labs(
-    x = "Region",
-    y = "Slope (Species Richness vs. Year)",
-    title = "Trends in Species Richness Over Time by Region"
-  )
-
-# Plot slopes for abundance
-ggplot(slopes, aes(x = region, y = abundance_slope)) +
-  geom_bar(stat = "identity", fill = "lightgreen") +
-  theme_minimal() +
-  labs(
-    x = "Region",
-    y = "Slope (Abundance vs. Year)",
-    title = "Trends in Abundance Over Time by Region"
-  )
-}
-
-# Calculate Jaccard similarity index for each year (presence/absence) + statistically significant 0.05 
-# Jaccard similarity index compares two sets of data to see how similar they are. It might be anywhere between 0 and 1. The greater the number, the closer the two sets of data are
-{
-  trop <- a3 %>%
-    filter(region == "Tropical")
-  
-  temp <- a3 %>%
-    filter(region == "Temperate")
-  
-jaccard_similarity <- function(year) {
-  species_trop <- trop %>% filter(year == !!year) %>% pull(genus_species) %>% unique()
-  species_temp <- temp %>% filter(year == !!year) %>% pull(genus_species) %>% unique()
-  
-  intersection <- length(intersect(species_trop, species_temp))
-  union <- length(union(species_trop, species_temp))
-  
-  if (union == 0) return(NA) else return(intersection / union)
-}
-
-years <- intersect(trop$year, temp$year)
-
-jaccard_indices <- map_dbl(years, jaccard_similarity)
-
-jaccard_results <- data.frame(year = years, jaccard_index = jaccard_indices)
-
-#plot the results of jacaard
-jaccard_results %>% 
-  ggplot(aes(year,jaccard_index)) +
-  geom_point() +
-  geom_smooth(method = lm) +
-  ylab("Jaccard index") + 
+ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
+  geom_point(aes(shape = region, colour = region), size = 5) + 
+  scale_color_brewer(palette = "Set2") +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 3) + 
+  facet_wrap(~region, scales = "free_y") + 
+  geom_text(data = subset(mean_sst, region == "Tropical"), 
+            aes(x = 1990, y = max(mean_sst) + 0.25, 
+                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
+            color = "black", size = 6, inherit.aes = FALSE) +
+  geom_text(data = subset(mean_sst, region == "Temperate"), 
+            aes(x = 1990, y = max(mean_sst) + 0.25, 
+                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
+            color = "black", size = 6, inherit.aes = FALSE) +
   xlab("Year") +
-  theme_classic()
+  ylab("Mean SST (°C)") +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 30), 
+    axis.text = element_text(size = 25), 
+    axis.title = element_text(size = 30),      
+    legend.position = "none") +
+  guides(size = "none", shape = guide_legend(override.aes = list(size = 5))) +
+  labs(colour = "Region", shape = "Region") #+ ggsave("figures/mean_sst_overtime.png", width = 20, height = 10, dpi = 300)
 
-jaccard_model <- lm(jaccard_index ~ year, data = jaccard_results)
-
-summary(jaccard_model) # statisitcally significant!
-}
-
-# beta diversity (compare temp/tropical regions how similar) - based on abundance data bray-curtis
-# Calculate beta diversity (Bray-Curtis) between regions or years
-# FIX PCA PLOT
+# HYPOTHESIS ONE - done not using ----
+## total abundance change over time by region - done not using 
 {
+df1 %>%
+  filter(total_abundance <= 5000) %>% # Filter outliers - heighest is 40 000 but are major outliers
+  ggplot(aes(x = factor(year), y = total_abundance, color = region, group = region)) + 
+  geom_point(size = 2.5, alpha = 0.7) +
+  geom_smooth(method = "loess") +
+  facet_wrap(~region, scales = "free") + 
+  scale_color_brewer(palette = "Set2") +
+  labs(x = "Year", 
+       y = "Total Abundance",
+       color = "Region") +
+  theme_minimal(base_size = 14)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_line(color = "gray80"),
+      panel.grid.minor = element_blank(),
+      text = element_text(size = 30), 
+      axis.text = element_text(size = 10), 
+      axis.title = element_text(size = 30),
+      legend.position = "none") #+ ggsave("figures/TotalAbundance.png", width = 25, height = 15, dpi = 300)
+}
+## NEXT INTREPERT THIS AND DO WITH MEAN-SST TO COMAPRE TOTAL ABUNDANCE / SPECIES RICHNESS TREND ----
+## compare species total abundance to temp_min/temp_max
+# Fit a linear model for temp_min
+lm_min <- lm(total_abundance ~ temp_min + region, data = df1)
+plot(lm_min) 
+
+# Fit a linear model for temp_max
+lm_max <- lm(total_abundance ~ temp_max + region, data = df1)
+summary(lm_max)
+
+lm_combined <- lm(total_abundance ~ temp_min + temp_max + region, data = df1)
+summary(lm_combined)
+
+cor_temp_min <- cor(df1$total_abundance, df1$temp_min, use = "complete.obs")
+cor_temp_max <- cor(df1$total_abundance, df1$temp_max, use = "complete.obs")
+
+cat("Correlation with temp_min:", cor_temp_min, "\n")
+cat("Correlation with temp_max:", cor_temp_max, "\n")
+
+lmer_model <- lmer(total_abundance ~ temp_min + temp_max + (1 | region), data = df1)
+summary(lmer_model)
+
+# make a plot that shows the make up of the data and the species we have in it ------
+# Species Composition Across Regions
+#use new df with phlym and stiff %>%
+  group_by(region, species) %>%
+  summarise(species_count = n()) %>%
+  ggplot(aes(x = region, y = species_count, fill = species)) + 
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Region", 
+       y = "Species Count", 
+       fill = "Species") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Heatmap of Species Presence Across Regions and Years %>%
+  group_by(year, region, species) %>%
+  summarise(species_count = n()) %>%
+  spread(key = species, value = species_count, fill = 0) %>%
+  ggplot(aes(x = year, y = region)) +
+  geom_tile(aes(fill = value), color = "white") +
+  scale_fill_viridis_c() +
+  labs(x = "Year", y = "Region", fill = "Species Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+#relative rank abundance plot (Whittaker plot) how evenly or unevenly species are distributed in dataset %>%
+    group_by(species) %>%
+    summarise(abundance = sum(species_richness, na.rm = TRUE)) %>%
+    arrange(desc(abundance)) %>%
+    ggplot(aes(x = reorder(species, -abundance), y = abundance)) +
+    geom_bar(stat = "identity", fill = "skyblue") +
+    labs(x = "Species", 
+         y = "Abundance", 
+         title = "Species Rank Abundance Plot") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+
+# beta diversity; COMPARE TO TEMP ----
+{   
 beta_diversity <- df1 %>%
   group_by(region, year) %>%
   summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
             .groups = "drop") %>%
   drop_na(bc_dist_mean)
 
-ggplot(beta_diversity, aes(x = year, y = bc_dist_mean, color = region)) +
-  geom_line() +
-  labs(title = "Beta Diversity Over Time by Region",
-       x = "Year", y = "Bray-Curtis Distance") +
-  theme_minimal()
+beta_diversity %>%
+ filter(year >= 1970 & year <= 2010) %>% 
+  ggplot(aes(x = factor(year), y = bc_dist_mean, color = region, group = region)) +
+  geom_line(linewidth = 6) +
+  geom_smooth(method = "lm", se = TRUE)+
+  facet_wrap(~region, scales = "free") +
+  labs(x = "Year", y = "Bray-Curtis Distance") +
+  scale_color_brewer(palette = "Set2") +
+  geom_text(data = subset(beta_diversity, region == "Temperate"), 
+            aes(x = 25, y = 0.69, label = "y = 1.2967x - 0.0003, R² = 0.0023, p > 0.05"), 
+            color = "black", size = 12, inherit.aes = FALSE) +
+  geom_text(data = subset(beta_diversity, region == "Tropical"), 
+            aes(x = 5, y = 0.69, label = "y = 4.9915x - 0.0021, R² = 0.0368, p > 0.05"), 
+            color = "black", size = 12, inherit.aes = FALSE) +
+  theme_minimal()+
+  theme_minimal(base_size = 14)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_line(color = "gray80"),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 30), 
+        axis.text = element_text(size = 17), 
+        axis.title = element_text(size = 30),      
+        legend.position = "none") + ggsave("figures/BetaDiversity.png", width = 30, height = 15, dpi = 300)
 
-# Perform PCoA
-pcoa <- cmdscale(beta_diversity, k = 2, eig = TRUE)
+# Run the linear model and extract p-values and coefficients for each region
+trop <- beta_diversity %>% 
+  filter(region == "Tropical")
+temp <- beta_diversity %>% 
+  filter(region == "Temperate")
 
-# Create a data frame for plotting
-pcoa_df <- as.data.frame(pcoa$points)
-colnames(pcoa_df) <- c("PC1", "PC2")
-pcoa_df$region <- species_matrix$region
-pcoa_df$year <- species_matrix$year
+lm_trop <- lm(bc_dist_mean ~ year, trop)
+lm_temp <- lm(bc_dist_mean ~ year, temp)
+summary(lm_temp)
+trop_sum <- tidy(lm_trop)
+temp_sum <- tidy(lm_temp)
+} # done 
+#Compare beta diversity to thermal tolerance of different species
+# Assuming 'beta_diversity' has species and community data, 
+beta_diversity2 <- df1 %>%
+  group_by(region, year, genus_species) %>%
+  summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
+            .groups = "drop") %>%
+  drop_na(bc_dist_mean)
 
-# PCoA plot FIXXXX
-ggplot(pcoa_df, aes(x = PC1, y = PC2, color = region, shape = factor(year))) +
-  geom_point(size = 3) +
+# and 'thermal_tolerance' contains 'species' and 'CTmax' columns
+thermal_tolerance <- df1 %>%
+  select(c(7,10:11, 14))
+
+# Merge the datasets by species - redo with species richness
+merged_data <- left_join(beta_diversity2, thermal_tolerance, by = "genus_species") %>% drop_na()
+
+#relationship between Beta Diversity and Thermal Tolerance (CTmax) - not working 
+ggplot(merged_data, aes(x = temp_max, y = bc_dist_mean)) +
+  geom_point(aes(color = region), size = 3, alpha = 0.7) +  # Scatter plot of CTmax vs. beta diversity
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +  # Linear regression line
+  labs(x = "Critical Thermal Maximum (CTmax)", y = "Bray-Curtis Distance (Beta Diversity)",
+       title = "Comparison of Beta Diversity and Thermal Tolerance") +
   theme_minimal() +
-  labs(x = paste("PC1 (", round(pcoa$eig[1] / sum(pcoa$eig) * 100, 1), "%)", sep = ""),
-    y = paste("PC2 (", round(pcoa$eig[2] / sum(pcoa$eig) * 100, 1), "%)", sep = ""),
-    color = "Year",
-    shape = "Region",
-    title = "PCoA of Beta Diversity (Bray-Curtis)")
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plot_data <- merged_data %>%
+  filter(year >= 1960 & year <= 2010) %>%  # Optional: filter for relevant years
+  group_by(region, genus_species, year) %>% 
+  summarise(
+    temp_min = mean(temp_min, na.rm = TRUE),
+    temp_max = mean(temp_max, na.rm = TRUE),
+    mean_sst = mean(mean_sst, na.rm = TRUE),
+    bc_dist_mean = mean(bc_dist_mean, na.rm = TRUE)) %>% 
+  ungroup()
+
+# Plot
+ggplot(plot_data, aes(x = genus_species)) +
+  geom_segment(aes(xend = genus_species, y = temp_min, yend = temp_max),
+               color = "skyblue", linewidth = 1.5) +
+  geom_point(aes(y = mean_sst), color = "orange", size = 3) +
+  # geom_point(aes(y = bc_dist_mean), color = "red", size = 2, alpha = 0.7) +
+  facet_wrap(~region, scales = "free_x") +  # Facet by region
+  labs(
+    x = "Species",
+    y = "Temperature (°C) / Bray-Curtis Distance",
+    title = "Thermal Breadth, Mean SST, and Bray-Curtis Distance by Species",
+    caption = "Blue bars: Thermal breadth (Temp Min to Max)\nOrange points: Mean SST\nRed points: Bray-Curtis Distance"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 12)
+  )
+
+{
+# 3. Statistical analysis
+# Compute correlation between beta diversity and thermal tolerance
+cor_test <- cor.test(merged_data$bc_dist_mean, merged_data$temp_max, method = "pearson")
+
+# Output the correlation result
+cat("Correlation between Beta Diversity and Thermal Tolerance:", cor_test$estimate, "\n")
+cat("p-value:", cor_test$p.value, "\n")
+
+# Optional: Regression analysis
+lm_model <- lm(bc_dist_mean ~ temp_max, data = merged_data)
+summary(lm_model)  # Get the summary of the regression model
 }
 
-# Calculate Shannon diversity for each group (species richness over time) 
+# Calculate Shannon diversity ; fix X -AXIS DISPLAY DIFFERENTLY ? COMPARE TO TEMP ----
+#for each group (species richness over time) 
 # Assuming you group data by region and year for diversity calculation
-#FILTER YEAR 
-{
-shannon_div <- a3 %>%
+shannon_div <- df1 %>%
   group_by(region, year) %>%
   summarise(Shannon = diversity(abundance, index = "shannon"))
 
-ggplot(shannon_div, aes(x = factor(year), y = Shannon, fill = region)) +
+shannon_div %>% 
+ggplot(aes(x = factor(year), y = Shannon, fill = region)) +
   geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~region, scales = "free") + 
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = "Year",
+       y = "Shannon Diversity Index",
+       fill = "Region")+
   theme_minimal() +
-  labs(
-    x = "Year",
-    y = "Shannon Diversity Index",
-    fill = "Region",
-    title = "Shannon Diversity by Region and Year"
-  )
-}
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_line(color = "gray80"),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 30), 
+        axis.text = element_text(size = 15), 
+        axis.title = element_text(size = 30),      
+        legend.position = "none")#+ ggsave("figures/ShannonDiversitybyRegionandYear.png", width = 20, height = 10, dpi = 300)
 
-# HYPOTHESIS TWO ----
-# compare thermal tolerance to species abundance 
-# phylogentic computation to fill in missing ctmax data based on phylogeny of the species 
-## use ctmax for same genus or family - match at genus level
-#scatter plot works better for speciees richness
-{
-# Compute genus-level averages for CTmax
-genus_ctmax <- a3 %>%
-  group_by(genus) %>%
-  summarise(genus_avg_ctmax = mean(TempMax, na.rm = TRUE))
+df1_shannon <- df1 %>%
+  group_by(year, region) %>%
+  summarise(shannon_div = -sum((species_richness / sum(species_richness)) * log(species_richness / sum(species_richness)), na.rm = TRUE))
 
-# Merge genus-level CTmax back into the main dataset
-a3 <- a3 %>%
-  left_join(genus_ctmax, by = "genus")
-
-a3 <- a3 %>%
-  mutate(TempMax_filled = ifelse(is.na(TempMax), genus_avg_ctmax, TempMax))
-
-# Scatterplot: Abundance vs. CTmax
-ggplot(a3, aes(x = TempMax_filled, y = abundance)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(method = "lm", color = "red", se = TRUE) +
-  facet_wrap(~region) +
+df1_shannon %>%
+  ggplot(aes(x = year, y = shannon_div, color = region)) + 
+  geom_line() +
+  geom_point() +
+  facet_wrap(~region, scales = "free") + 
+  labs(x = "Year", 
+       y = "Shannon Diversity Index",
+       color = "Region") +
   theme_minimal() +
-  labs(
-    x = "Thermal Tolerance (CTmax)",
-    y = "Species Abundance",
-    title = "Relationship between CTmax and Species Abundance")
-
-# Linear regression model
-model <- lm(abundance ~ TempMax_filled, data = a3)
-summary(model)
-}
+  scale_color_brewer(palette = "Set2") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text = element_text(size = 15), 
+        axis.title = element_text(size = 20), 
+        legend.text = element_text(size = 15))
