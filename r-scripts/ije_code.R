@@ -55,9 +55,9 @@ mean_sst <- sst_obs3 %>%
   summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
 
 ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
-  geom_point(aes(shape = region, colour = region), size = 3) + 
+  geom_point(aes(shape = region, colour = region), size = 5) + 
   scale_color_brewer(palette = "Set2") +
-  geom_smooth(method = "lm", se = TRUE) + 
+  geom_smooth(method = "lm", se = TRUE, linewidth = 3) + 
   facet_wrap(~region, scales = "free_y") + 
   geom_text(data = subset(mean_sst, region == "Tropical"), 
             aes(x = 1990, y = max(mean_sst) + 0.25, 
@@ -70,12 +70,11 @@ ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
   theme_minimal(base_size = 14) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid.major = element_line(color = "gray80"),
+  theme(panel.grid.major = element_line(color = "gray80"),
     panel.grid.minor = element_blank(),
-    text = element_text(size = 20), 
-    axis.text = element_text(size = 15), 
-    axis.title = element_text(size = 20),      
+    text = element_text(size = 30), 
+    axis.text = element_text(size = 25), 
+    axis.title = element_text(size = 30),      
     legend.position = "none") +
   guides(size = "none", shape = guide_legend(override.aes = list(size = 5))) +
   labs(colour = "Region", shape = "Region") #+ ggsave("figures/mean_sst_overtime.png", width = 20, height = 10, dpi = 300)
@@ -218,7 +217,7 @@ beta_diversity2 <- df1 %>%
 thermal_tolerance <- df1 %>%
   select(c(7,10:11, 14))
 
-# Merge the datasets by species
+# Merge the datasets by species - redo with species richness
 merged_data <- left_join(beta_diversity2, thermal_tolerance, by = "genus_species") %>% drop_na()
 
 #relationship between Beta Diversity and Thermal Tolerance (CTmax) - not working 
@@ -229,17 +228,49 @@ ggplot(merged_data, aes(x = temp_max, y = bc_dist_mean)) +
        title = "Comparison of Beta Diversity and Thermal Tolerance") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plot_data <- merged_data %>%
+  filter(year >= 1960 & year <= 2010) %>%  # Optional: filter for relevant years
+  group_by(region, genus_species, year) %>% 
+  summarise(
+    temp_min = mean(temp_min, na.rm = TRUE),
+    temp_max = mean(temp_max, na.rm = TRUE),
+    mean_sst = mean(mean_sst, na.rm = TRUE),
+    bc_dist_mean = mean(bc_dist_mean, na.rm = TRUE)) %>% 
+  ungroup()
+
+# Plot
+ggplot(plot_data, aes(x = genus_species)) +
+  geom_segment(aes(xend = genus_species, y = temp_min, yend = temp_max),
+               color = "skyblue", linewidth = 1.5) +
+  geom_point(aes(y = mean_sst), color = "orange", size = 3) +
+  # geom_point(aes(y = bc_dist_mean), color = "red", size = 2, alpha = 0.7) +
+  facet_wrap(~region, scales = "free_x") +  # Facet by region
+  labs(
+    x = "Species",
+    y = "Temperature (°C) / Bray-Curtis Distance",
+    title = "Thermal Breadth, Mean SST, and Bray-Curtis Distance by Species",
+    caption = "Blue bars: Thermal breadth (Temp Min to Max)\nOrange points: Mean SST\nRed points: Bray-Curtis Distance"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+    panel.grid.major = element_line(color = "gray80"),
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 12)
+  )
+
 {
 # 3. Statistical analysis
 # Compute correlation between beta diversity and thermal tolerance
-cor_test <- cor.test(merged_data$bc_dist_mean, merged_data$CTmax, method = "pearson")
+cor_test <- cor.test(merged_data$bc_dist_mean, merged_data$temp_max, method = "pearson")
 
 # Output the correlation result
 cat("Correlation between Beta Diversity and Thermal Tolerance:", cor_test$estimate, "\n")
 cat("p-value:", cor_test$p.value, "\n")
 
 # Optional: Regression analysis
-lm_model <- lm(bc_dist_mean ~ CTmax, data = merged_data)
+lm_model <- lm(bc_dist_mean ~ temp_max, data = merged_data)
 summary(lm_model)  # Get the summary of the regression model
 }
 
