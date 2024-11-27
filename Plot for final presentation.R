@@ -12,9 +12,6 @@ library(stringr)
 # Load your data (update the path as necessary)
 data <- read.csv("data-processed/btfbsst_without_NA.csv")
 
-# Correct Longitude (if needed)
-data$longitude_corrected <- data$longitude2 - 360  # Adjust if necessary for proper mapping
-
 # Panel (a): Map with Hexagonal Binning
 # Load the world map
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -26,9 +23,9 @@ map_plot <- ggplot() +
   coord_sf(ylim = c(-0.5,80)) +
   scale_fill_viridis(option = "plasma", name = "n-surveys") +
   theme_minimal() +
-  theme(panel.background = element_rect(fill = "transparent", colour = NA),
-        plot.background = element_rect(fill = "transparent", colour = NA),
-        legend.background = element_rect(fill = "transparent", colour = NA)) +
+  theme(panel.background = element_blank(),
+        plot.background = element_blank(),
+        legend.background = element_blank()) +
   labs(title = "(a) Survey Locations", x = "Longitude", y = "Latitude")
 
 # Panel (b): Boxplot with Scatter
@@ -54,11 +51,11 @@ violin_plot <- ggplot(filtered_data, aes(x = reorder(genus_species, mean_summer_
     panel.grid.major.x = element_blank(),  # Remove vertical gridlines
     panel.grid.minor = element_blank(),    # Remove minor gridlines
     panel.grid.major.y = element_line(colour = "grey90"),  # Keep horizontal gridlines
-    panel.background = element_rect(fill = "transparent", colour = NA),
-    plot.background = element_rect(fill = "transparent", colour = NA))+
+    panel.background = element_blank(),
+    plot.background = element_blank())+
   labs(title = "(b) Temperature Distribution by Species",
-    x = NULL,  # Remove x-axis label
-    y = "Mean Summer SST (°C)") +
+       x = NULL,  # Remove x-axis label
+       y = "Mean Summer SST (°C)") +
   scale_y_continuous(limits = c(10, 30), breaks = seq(10, 30, by = 5))
 
 # Combine the plots
