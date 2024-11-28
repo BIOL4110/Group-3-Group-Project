@@ -50,16 +50,23 @@ fb_trop <- tropical_fish %>%
   pivot_longer(cols = c(temp_max, temp_min), names_to = "Thermal Tolerance", values_to = "Temperature")
 View(fb_trop)
 
+library(viridis)
+
+fb_trop <- fb_trop %>%
+  mutate(fishbase_name = reorder(fishbase_name, thermal_tolerance, FUN = max, order = TRUE))
+
 #Create the plot
-ggplot(fb_trop, aes(x = fishbase_name, y = Temperature, color = thermal_tolerance)) +
-  geom_point(size = 3) +
-  geom_line(aes(group = interaction(fishbase_name, thermal_tolerance)), linetype = "dotted") +
+ggplot(fb_trop, aes(x = fishbase_name, y = Temperature, fill = thermal_tolerance)) +
+  geom_boxplot(alpha = 0.3)+
+  scale_fill_viridis(option = "D") +
   labs(title = "Thermal Tolerance of Selected Tropical Fish Species",
        x = "Tropical Fish Species",
        y = "Temperature (°C)",
        color = "Thermal Tolerance") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 15),
+        text = element_text(size = 25),
+        axis.text.y = element_text(size = 15)) + ggsave("figures/tropicaltol.png", width = 30, height = 15, dpi = 300)
 
 #Temperate Data
 temperate_fish <- h2_data %>% 
@@ -72,16 +79,23 @@ fb_temp <- temperate_fish %>%
   pivot_longer(cols = c(temp_max, temp_min), names_to = "Thermal Tolerance", values_to = "Temperature")
 View(fb_temp)
 
+##
+fb_temp <- fb_temp %>%
+  mutate(fishbase_name = reorder(fishbase_name, thermal_tolerance, FUN = max, order = TRUE))
+
 #Create the plot
-ggplot(fb_temp, aes(x = fishbase_name, y = Temperature, color = thermal_tolerance)) +
-  geom_point(size = 1) +
-  geom_line(aes(group = interaction(fishbase_name, thermal_tolerance)), linetype = "dotted") +
+ggplot(fb_temp, aes(x = fishbase_name, y = Temperature, fill = thermal_tolerance)) +
+  geom_boxplot(alpha = 0.3)+
+  scale_fill_viridis(option = "D") +
+  #geom_line(aes(group = interaction(fishbase_name, thermal_tolerance)), linetype = "dotted") +
   labs(title = "Thermal Tolerance of Selected Temperate Fish Species",
        x = "Temperate Fish Species",
        y = "Temperature (°C)",
        color = "Thermal Tolerance") +
   theme_minimal() +
-  theme(axis.text.x = element_text(size = 5, angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 15),
+        text = element_text(size = 25),
+        axis.text.y = element_text(size = 15))+ ggsave("figures/temperatetol.png", width = 30, height = 15, dpi = 300)
 
 #Plotting SST over time
 ggplot(fb_trop, aes(x = year, y = mean_summer_sst_degC)) +
