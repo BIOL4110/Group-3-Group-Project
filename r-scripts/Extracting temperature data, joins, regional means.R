@@ -9,15 +9,6 @@ library(ggplot2)
 library(ggpmisc)
 
 
-
-
-#DO NOT RUN FROM HERE!!!
-#the following takes a while to run so I have written a .csv file of the finished product
-#please scroll down to work with figures
-
-
-
-
 #following this article to see what I can achieve 
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
 
@@ -94,14 +85,12 @@ write_csv(sst_obs3,"data-processed/extracted_sst.csv")
 
 
 
-#BEGIN HERE TO WORK WITH FIGURES AND JOINS!!!
-
-
 
 sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
 #Find average summer SSTs in the tropical and temperate regions.
 #Looking for trends between 1963 - 2024
+#Plotting trends
 
 mean_sst <- sst_obs3 %>% 
   #creat column identifying regions by latitude
@@ -154,6 +143,9 @@ ggsave("Figures/Mean summer SST.png",
        plot = sum_sst, bg = "transparent",
        width = 20, height = 10, dpi = 300)
 
+
+
+
 #Join with harmonized btfb set (BioTime - Fishbase)
 harm_btfb <- read_csv("data-processed/btfb_without_NA.csv")
 
@@ -185,96 +177,3 @@ full_harm_btfbsst_clean <- full_harm_btfbsst %>%
   na.omit()
 
 write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
-
-
-
-
-
-
-
-
-#The remaining code is unused for our project.
-#We chose to work with the BioTime and Fishbase data.
-
-
-
-#Join with harmonized btgt set (BioTime - GlobTherm)
-harm_btgt <- read_csv("data-processed/full_harmonized_btgt.csv")
-
-harm_btgt %>% 
-  mutate(as_date(year)) %>% 
-  mutate(latitude = as.numeric(latitude),
-         longitude = as.numeric(longitude))
-
-#Duplicate latitude and longitude to retain original values after rounding
-harm_btgt <- harm_btgt %>% 
-  mutate(latitude2 = latitude,
-         longitude2 = longitude)
-
-#Here we need to round to the nearest 0.5 in latitude and longitude due to the resolution of the termperature dataset
-full_harm_btgt_rounded <- harm_btgt %>% 
-  mutate(latitude = round(latitude*2)/2) %>% 
-  mutate(longitude = round(longitude*2)/2)
-
-#We need to convert longitude from a -180 to 180 system into a 0 - 360 system so that it matches the temperature data
-full_harm_btgt_rounded$longitude <- ifelse(full_harm_btgt_rounded$longitude < 0, 
-                                           full_harm_btgt_rounded$longitude + 360,
-                                           full_harm_btgt_rounded$longitude)
-
-#join mean summer ssts data set that match btgt based on latitude, longitude, and year
-full_harm_btgtsst <- left_join(full_harm_btgt_rounded, sst_obs3, 
-                               by = c("latitude", "longitude", "year"))
-
-full_harm_btgtsst_clean <- full_harm_btgtsst %>% 
-  na.omit()
-
-write_csv(full_harm_all_data, "data-processed/full_harm_all_data.csv")
-
-
-
-
-#Join with BioTime set
-BioTime %>% 
-  mutate(as_date(year)) %>% 
-  mutate(latitude = as.numeric(latitude),
-         longitude = as.numeric(longitude))
-
-#Duplicate latitude and longitude to retain original values after rounding
-#Will be needed later for full harmonization
-BioTime <- BioTime %>% 
-  mutate(latitude2 = latitude,
-         longitude2 = longitude)
-
-#Here we need to round to the nearest 0.5 in latitude and longitude due to the resolution of the termperature dataset
-BioTime_rounded <- BioTime %>% 
-  mutate(latitude = round(latitude*2)/2) %>% 
-  mutate(longitude = round(longitude*2)/2)
-
-print(sapply(BioTime_rounded,class))
-print(sapply(sst_obs3,class))
-
-#We need to convert longitude from a -180 to 180 system into a 0 - 360 system so that it matches the temperature data
-BioTime_rounded$longitude <- ifelse(BioTime_rounded$longitude < 0, BioTime_rounded$longitude + 360, BioTime_rounded$longitude)
-
-#join mean summer ssts from cleaned sst data set that match BioTime based on latitude, longitude, and year
-BioTime_sst <- left_join(BioTime_rounded, sst_obs3, 
-                         by = c("latitude", "longitude", "year"))
-
-#retain original latitude and longitude values only and relocate to the previous position
-BioTime_sst <- BioTime_sst %>% 
-  select(-latitude,-longitude, -genus_species) %>% 
-  rename(latitude = latitude2,
-         longitude = longitude2) %>% 
-  select(abundance, year, latitude, longitude, genus, species, region, mean_summer_sst_degC)
-
-
-#See dataset without NA values
-BioTime_sst_clean <- BioTime_sst %>% 
-  na.omit()
-
-
-write_csv(BioTime_sst,"data-processed/BioTime summer sst with NAs.csv")
-write_csv(BioTime_sst_clean, "data-processed/BioTime summer sst without NAs.csv")
-
-
-
