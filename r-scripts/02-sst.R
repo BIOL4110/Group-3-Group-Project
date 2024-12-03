@@ -1,9 +1,5 @@
 #02-sst.r
-
-# ADD SEA SURFACE TEMEPRATURES - 
-
-#link to sst data download https://psl.noaa.gov/repository/entry/show?entryid=f45cf25c-bde2-44bd-bf3d-c943d92c0dd8
-
+# IN / SB
 
 library(tidyverse)
 library(dplyr)
@@ -12,11 +8,10 @@ library(ncdf4)
 library(ggplot2)
 library(ggpmisc)
 
-
 #following this article to see what I can achieve in temperature extraction
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
 
-#this file is found in our OSF project
+#this file can be found in our OSF project
 temp_nc <- nc_open("data-raw/sst.mon.mean.nc")
 
 #exploring some aspects of the .nc file
@@ -88,70 +83,6 @@ head(sst_obs3)
 
 write_csv(sst_obs3,"data-processed/extracted_sst.csv")
 
-
-
-
-
-#Find average summer SSTs in the tropical and temperate regions.
-#Looking for trends between 1963 - 2024
-#Plotting trends
-
-sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
-
-mean_sst <- sst_obs3 %>% 
-  #creat column identifying regions by latitude
-  mutate(region = case_when(latitude >= 0 & latitude <= 23.5 ~ "Tropical",
-                            latitude > 23.5 ~ "Temperate")) %>% 
-  group_by(year, region) %>% 
-  #calculate mean SST by year in tropical region
-  summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
-
-trop <- mean_sst %>% 
-  filter(region == "Tropical")
-temp <- mean_sst %>% 
-  filter(region == "Temperate")
-
-lm_trop <- lm(mean_sst ~ year, trop)
-summary(lm_trop)
-
-lm_temp <- lm(mean_sst ~ year, temp)
-summary(lm_temp)
-
-#Plot yearly mean summer SST
-ggplot(mean_sst, aes(x = year,
-                     y = mean_sst,
-                     group = region)) +
-  geom_point(aes(shape = region, colour = region, size = 5)) +
-  scale_color_brewer(palette = "Set2") +
-  geom_smooth(method = "lm") +
-  facet_wrap(~region, scales = "free_y") +
-  geom_text(aes(x = 1990, y = 26, 
-                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), #tropical
-            color = "black", size = 8) +
-  geom_text(aes(x = 1990, y = 19, 
-                label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), # temperate
-            color = "black", size = 8) +
-  xlab("Year") +
-  ylab("Mean SST (°C)") +
-  theme_minimal(base_size = 14)+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.major = element_line(color = "gray80"),
-        panel.grid.minor = element_blank(),
-        text = element_text(size = 30), 
-        axis.text = element_text(size = 15), 
-        axis.title = element_text(size = 30),      
-        legend.position = "right") +
-  guides(size = "none",
-         shape = guide_legend(override.aes = list(size = 5))) +
-  labs(colour = "Region", shape = "Region")
-
-ggsave("Figures/Mean summer SST.png", 
-       plot = sum_sst, bg = "transparent",
-       width = 20, height = 10, dpi = 300)
-
-
-
-
 #Join with harmonized btfb set (BioTime - Fishbase)
 harm_btfb <- read_csv("data-processed/btfb_without_NA.csv")
 
@@ -188,9 +119,9 @@ full_harm_btfbsst_clean <- full_harm_btfbsst_clean %>%
   rename(latitude = latitude2,
          longitude = longitude2)
 
-write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
+#write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
 
-# SEA SURFACE TEMPERATURES RISING OVER THE YEARS - done ----
+# PLOTTINH SEA SURFACE TEMPERATURES RISING OVER THE YEARS  ----
 ## only summer months
 sst_trend_model <- lm(mean_sst ~ year, data = mean_sst)
 summary(sst_trend_model)
@@ -200,7 +131,6 @@ slope <- coef(sst_trend_model)["year"]
 cat("The slope of the trend line is:", slope, "°C per year\n")
 #positive slope of 0.01C per year - temp increasing that much every year 
 
-#stuarts data
 sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
 mean_sst <- sst_obs3 %>% 
