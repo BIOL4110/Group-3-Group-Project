@@ -9,7 +9,7 @@ library(ggplot2)
 library(ggpmisc)
 
 
-#following this article to see what I can achieve 
+#following this article to see what I can achieve in temperature extraction
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
 
 temp_nc <- nc_open("data-raw/sst.mon.mean.nc")
@@ -86,11 +86,12 @@ write_csv(sst_obs3,"data-processed/extracted_sst.csv")
 
 
 
-sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
 #Find average summer SSTs in the tropical and temperate regions.
 #Looking for trends between 1963 - 2024
 #Plotting trends
+
+sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
 mean_sst <- sst_obs3 %>% 
   #creat column identifying regions by latitude
