@@ -128,7 +128,7 @@ full_harm_btfbsst_clean <- full_harm_btfbsst_clean %>%
 
 #write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
 
-# PLOTTINH SEA SURFACE TEMPERATURES RISING OVER THE YEARS  ----
+# PLOTTING SEA SURFACE TEMPERATURES RISING OVER THE YEARS  ----
 ## only summer months
 sst_trend_model <- lm(mean_sst ~ year, data = mean_sst)
 summary(sst_trend_model)
