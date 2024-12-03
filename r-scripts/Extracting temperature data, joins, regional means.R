@@ -177,4 +177,10 @@ full_harm_btfbsst <- left_join(full_harm_rounded, sst_obs3,
 full_harm_btfbsst_clean <- full_harm_btfbsst %>% 
   na.omit()
 
+#No longer need to retain rounded location data. Clear and keep original location data associated with BioTime
+full_harm_btfbsst_clean <- full_harm_btfbsst_clean %>% 
+  select(-c(longitude,latitude)) %>% 
+  rename(latitude = latitude2,
+         longitude = longitude2)
+
 write_csv(full_harm_btfbsst_clean, "data-processed/btfbsst_without_NA.csv")
