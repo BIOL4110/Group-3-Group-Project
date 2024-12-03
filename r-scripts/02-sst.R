@@ -219,7 +219,7 @@ final_plot <- map_plot / violin_plot +
 # Display the final plot
 print(final_plot)
 
-ggsave("Figures/Plot-limited.species.png", 
+ggsave("Figures/Plot.species.png", 
        plot = final_plot, 
        width = 12, 
        height = 8, 
