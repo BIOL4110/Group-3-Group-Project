@@ -10,7 +10,7 @@ library(stringr)
 library(dplyr)
 
 ## this data is actually pulled from the OSF project
-studies_data <- read_csv("data-raw/studies_data_ije.csv") %>%
+studies_data <- read_csv("data-raw/biotime.csv") %>%
   clean_names()
 
 #Biotime cleaning ----
