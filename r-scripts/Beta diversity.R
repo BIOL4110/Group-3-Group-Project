@@ -16,7 +16,6 @@ df_trop <- bio_time %>%
   select(genus_species,year)
  
 
-
 df_temp <- bio_time %>%
   subset(!is.na(species)) %>% 
   filter(latitude > 23.5 & latitude <= 66.5 & year > 2000 & year < 2011) %>% 

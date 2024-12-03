@@ -33,46 +33,6 @@ df1 <- left_join(b2,df2, by = c("year", "mean_sst", "region", "genus_species"))
 
 #cross reference genus_species by fishbase_name - not all match so how do we fix?
 ## is it false bc it has an underscore - check 
-
-# make a plot that shows the make up of the data and the species we have in it ------
-# Species Composition Across Regions
-#use new df with phlym and stiff %>%
-  group_by(region, species) %>%
-  summarise(species_count = n()) %>%
-  ggplot(aes(x = region, y = species_count, fill = species)) + 
-  geom_bar(stat = "identity", position = "stack") +
-  labs(x = "Region", 
-       y = "Species Count", 
-       fill = "Species") +
-  scale_fill_brewer(palette = "Set3") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-#Heatmap of Species Presence Across Regions and Years %>%
-  group_by(year, region, species) %>%
-  summarise(species_count = n()) %>%
-  spread(key = species, value = species_count, fill = 0) %>%
-  ggplot(aes(x = year, y = region)) +
-  geom_tile(aes(fill = value), color = "white") +
-  scale_fill_viridis_c() +
-  labs(x = "Year", y = "Region", fill = "Species Count") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-#relative rank abundance plot (Whittaker plot) how evenly or unevenly species are distributed in dataset %>%
-    group_by(species) %>%
-    summarise(abundance = sum(species_richness, na.rm = TRUE)) %>%
-    arrange(desc(abundance)) %>%
-    ggplot(aes(x = reorder(species, -abundance), y = abundance)) +
-    geom_bar(stat = "identity", fill = "skyblue") +
-    labs(x = "Species", 
-         y = "Abundance", 
-         title = "Species Rank Abundance Plot") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-
-  
 # beta diversity; COMPARE TO TEMP ----
 {   
 beta_diversity <- df1 %>%
