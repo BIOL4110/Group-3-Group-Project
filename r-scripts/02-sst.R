@@ -7,6 +7,13 @@ library(lubridate)
 library(ncdf4)
 library(ggplot2)
 library(ggpmisc)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(viridis)
+library(patchwork)
+library(hexbin)
+library(stringr)
 
 #following this article to see what I can achieve in temperature extraction
 #https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
@@ -166,5 +173,56 @@ ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
   guides(size = "none", shape = guide_legend(override.aes = list(size = 5))) +
   labs(colour = "Region", shape = "Region") + ggsave("figures/mean_sst_overtime.png", width = 20, height = 10, dpi = 300)
 
+# Panel (a): Map with Hexagonal Binning
+# Load the world map
+world <- ne_countries(scale = "medium", returnclass = "sf")
 
+# Hexagonal binning map
+map_plot <- ggplot() +
+  geom_sf(data = world, fill = "lightgrey", colour = "white") +
+  geom_hex(data = full_harm_btfbsst_clean, aes(x = longitude, y = latitude), bins = 50) +
+  coord_sf(ylim = c(-0.5,80)) +
+  scale_fill_viridis(option = "plasma", name = "n-surveys") +
+  theme_minimal() +
+  theme(panel.background = element_blank(),
+        plot.background = element_blank(),
+        legend.background = element_blank()) +
+  labs(title = "(a) Survey Locations", x = "Longitude", y = "Latitude")
+
+# Panel (b): Violin plot
+
+filtered_data <- full_harm_btfbsst_clean %>%
+  mutate(genus_species = str_replace_all(genus_species, "_", " "))
+
+# Create the violin plot
+
+violin_plot <- ggplot(filtered_data, aes(x = reorder(genus_species, mean_summer_sst_degC, FUN = median),
+                                         y = mean_summer_sst_degC)) +
+  geom_violin(fill = "lightgrey", colour = "black", width = 0.8) +  # Adjust width for compactness
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 8),  # Rotate labels vertically
+    panel.grid.major.x = element_blank(),  # Remove vertical gridlines
+    panel.grid.minor = element_blank(),    # Remove minor gridlines
+    panel.grid.major.y = element_line(colour = "grey90"),  # Keep horizontal gridlines
+    panel.background = element_blank(),
+    plot.background = element_blank())+
+  labs(title = "(b) Temperature Distribution by Species",
+       x = NULL,  # Remove x-axis label
+       y = "Mean Summer SST (°C)") +
+  scale_y_continuous(limits = c(10, 30), breaks = seq(10, 30, by = 5))
+
+# Combine the plots
+final_plot <- map_plot / violin_plot +
+  plot_layout(heights = c(2,1))
+
+# Display the final plot
+print(final_plot)
+
+ggsave("Figures/Plot-limited.species.png", 
+       plot = final_plot, 
+       width = 12, 
+       height = 8, 
+       bg = "transparent", 
+       dpi = 300)
 
