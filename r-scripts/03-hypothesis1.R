@@ -12,6 +12,9 @@ library(lme4)
 library(ggpmisc)
 library(viridis)
 library(patchwork)
+library(gridExtra)
+library(RColorBrewer)
+library(grid)
 
 # SETUP ----
 b <- read_csv("data-processed/btfbsst_without_NA.csv")
@@ -101,14 +104,22 @@ ggplot(aes(x = factor(year), y = Shannon, fill = region)) +
         axis.title = element_text(size = 30),      
         legend.position = "none") 
 
+# Shannon diversity separated by region
 df1_shannon <- df1 %>%
   group_by(year, region) %>%
   summarise(shannon_div = -sum((species_richness / sum(species_richness)) * log(species_richness / sum(species_richness)), na.rm = TRUE))
 
-# Shannon diversity separated by region
-library(gridExtra)
-library(RColorBrewer)
-library(grid)
+tropical_plot <- df1_shannon %>%
+  filter(year <= 2010, region == "Tropical", shannon_div >= 1)
+
+troplm <- lm(shannon_div ~ year, data = tropical_plot)
+summary(troplm)
+
+temperate_plot <- df1_shannon %>%
+  filter(year <= 2010, region == "Temperate", shannon_div >= 1) 
+
+templm <- lm(shannon_div ~ year, data = temperate_plot)
+summary(templm)
 
 shannon <- df1_shannon %>%
   filter(year >= 1967, year <= 2010, 
@@ -139,74 +150,9 @@ shannon %>%
       axis.text.y = element_text(size = 25),
       axis.title = element_text(size = 30),      
       legend.position = "none",
-      strip.text = element_text(size = 30, face = "bold")) + ggsave("figures/ShannonDiversityFINAL.png", width = 30, height = 15, dpi = 300)
-
-tropical_plot <- df1_shannon %>%
-  filter(year <= 2010, region == "Tropical", shannon_div >= 1)
-
-troplm <- lm(shannon_div ~ year, data = tropical_plot)
-summary(troplm)
-
-tropical_plot %>%
-  ggplot(aes(x = year, y = shannon_div, color = region)) + 
-  geom_smooth(method = "lm", se = TRUE, linewidth = 4) +
-  geom_point(size = 4, alpha = 0.7) +
-  ggtitle("Tropical") +
-  geom_text(data = subset(df1_shannon), 
-            aes(x = 2006, y = max(shannon_div) + 0.25, 
-                label = "y = 0.1484x + -292.1347, R² = 0.543, p < 0.05"), 
-            color = "black", size = 12, inherit.aes = FALSE) +
-  scale_color_manual(values = "#FC8D62") + 
-  scale_x_continuous(breaks = seq(min(df1_shannon$year), max(df1_shannon$year), by = 1)) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(hjust = 1),
-    axis.text = element_text(size = 15),
-    axis.title = element_blank(), # Remove axis titles
-    plot.title = element_text(size = 20, hjust = 0.5), # Center the title
-    legend.position = "none")
-
-temperate_plot <- df1_shannon %>%
-  filter(year <= 2010, region == "Temperate", shannon_div >= 1) 
-
-templm <- lm(shannon_div ~ year, data = temperate_plot)
-summary(templm)
-
-temperate_plot %>%
-  ggplot(aes(x = year, y = shannon_div, color = region)) + 
-  geom_smooth(method = "lm", se = TRUE, linewidth = 4) +
-  geom_point(size = 4, alpha = 0.7) +
-  ggtitle("Temperate") +
-  geom_text(data = subset(df1_shannon), 
-            aes(x = 1985, y = max(shannon_div) + 0.50, 
-                label = "y = 0.0655x + -125.1170, R² = 0.394, p < 0.05"), 
-            color = "black", size = 12, inherit.aes = FALSE) +
-  scale_color_manual(values = "#66C2A5") + 
-  scale_x_continuous(breaks = seq(min(df1_shannon$year), max(df1_shannon$year), by = 5)) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(hjust = 1),
-    axis.text = element_text(size = 15),
-    axis.title = element_blank(),
-    plot.title = element_text(size = 20, hjust = 0.5), 
-    legend.position = "none")
-
-plot(temperate_plot)
-# Create a shared axis label as a grob
-x_axis_label <- textGrob("Year", gp = gpar(fontsize = 25))
-y_axis_label <- textGrob("Shannon Diversity Index", rot = 90, gp = gpar(fontsize = 25))
-
-# Arrange the plots with the shared labels
-combined <- grid.arrange(arrangeGrob(grobs = list(temperate_plot, tropical_plot),
-    layout_matrix = rbind(c(1, 2)), 
-    widths = c(1, 1)), 
-  left = y_axis_label, 
-  bottom = x_axis_label) 
-
-ggsave(filename = "figures/shannon_diversity2.png", plot = combined, width = 30, height = 15, dpi = 300)
+      strip.text = element_text(size = 30, face = "bold")) #+ ggsave("figures/ShannonDiversityFINAL.png", width = 30, height = 15, dpi = 300)
 
 # species richness by sst- finish  ----
-
 # Merge the datasets by species - redo with species richness
 merged_data <- left_join(df1, df1_shannon, by = c("year", "region")) %>% drop_na()
 
