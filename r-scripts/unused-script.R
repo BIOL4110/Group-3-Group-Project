@@ -1,5 +1,5 @@
 # not used for analysis
-
+# saving code that was helpful for us / steps we took but did not use in the final analysis
 ## plotting species richness over time ------
 # tropical biodiversity
 trop_fish_diversity <- trop_df %>%
@@ -420,4 +420,140 @@ harmonized_biotime_processed <- merged %>%
   # calculate accuracy as the proportion of rows where genus_species matches th_genus_species
   accuracy <- mean(harmonized_biotime_processed2$is_match)
   print(paste("Accuracy:", accuracy * 100, "%"))
+  }
+
+# logged abundance code- eh not really working ---- 
+
+# Step 1: Calculate Topt as the midpoint of Tmin and Tmax (or customize as needed)
+df2 <- df1 %>%
+  mutate(Topt = (temp_min + temp_max) / 2)
+
+# Step 2: Log-transform abundance
+df2 <- df2 %>%
+  mutate(log_abundance = log(abundance + 1))  # Avoid log(0)
+
+# Step 3: Fit a TPC curve (e.g., Gaussian or quadratic fit)
+tpc_fits <- df2 %>%
+  group_by(region, genus_species) %>%
+  filter(n_distinct(mean_sst) > 2) %>%  # Ensure at least 3 unique points for a quadratic fit
+  summarise(fit = list(lm(log_abundance ~ poly(mean_sst, 2))), .groups = "drop")
+
+# Step 2: Extract the fitted TPC curves
+tpc_predictions <- tpc_fits %>%
+  mutate(predictions = map(fit, ~ {
+    data.frame(mean_sst = seq(min(df2$mean_sst, na.rm = TRUE), 
+                              max(df2$mean_sst, na.rm = TRUE), length.out = 100),
+               fitted_values = predict(.x, 
+                                       newdata = data.frame(mean_sst = seq(min(df2$mean_sst, na.rm = TRUE), 
+                                                                           max(df2$mean_sst, na.rm = TRUE), length.out = 100))))
+  })) %>%
+  unnest(predictions)
+
+df2_topt <- df2 %>%
+  group_by(region, genus_species) %>%
+  summarise(
+    t_opt = mean(mean_sst[log_abundance == max(log_abundance, na.rm = TRUE)]),
+    .groups = "drop"
+  )
+
+# Step 2: Merge Topt with the original dataframe
+df2 <- df2 %>%
+  left_join(df2_topt, by = c("region", "genus_species"))
+
+# Step 3: Create the plot
+df2 %>%
+  ggplot(aes(x = mean_sst, y = log_abundance, color = genus_species)) +
+  geom_point(alpha = 0.6, size = 3) + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, linewidth = 1) +  # Quadratic fit
+  geom_vline(aes(xintercept = t_opt), linetype = "dashed", color = "orange", linewidth = 1) +  # Topt line
+  facet_wrap(~region, scales = "free", ncol = 1) +  # Facet by region and species
+  labs(x = "Temperature (°C)", 
+       y = "Log Abundance", 
+       title = "Abundance vs. Temperature with Topt") +
+  scale_color_brewer(palette = "Set2") +
+  theme_minimal() +
+  theme(strip.text = element_text(size = 14, face = "bold"), 
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        legend.position = "none")
+
+
+
+
+# HYPOTHESIS ONE - done not using ----
+## total abundance change over time by region - done not using 
+{
+  df1 %>%
+    filter(total_abundance <= 5000) %>% # Filter outliers - heighest is 40 000 but are major outliers
+    ggplot(aes(x = factor(year), y = total_abundance, color = region, group = region)) + 
+    geom_point(size = 2.5, alpha = 0.7) +
+    geom_smooth(method = "loess") +
+    facet_wrap(~region, scales = "free") + 
+    scale_color_brewer(palette = "Set2") +
+    labs(x = "Year", 
+         y = "Total Abundance",
+         color = "Region") +
+    theme_minimal(base_size = 14)+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          panel.grid.major = element_line(color = "gray80"),
+          panel.grid.minor = element_blank(),
+          text = element_text(size = 30), 
+          axis.text = element_text(size = 10), 
+          axis.title = element_text(size = 30),
+          legend.position = "none") #+ ggsave("figures/TotalAbundance.png", width = 25, height = 15, dpi = 300)
+}
+#Compare beta diversity to thermal tolerance of different species , veirfy if works ------
+# Assuming 'beta_diversity' has species and community data, 
+beta_diversity2 <- df1 %>%
+  group_by(region, year, genus_species) %>%
+  summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
+            .groups = "drop") %>%
+  drop_na(bc_dist_mean)
+
+# and 'thermal_tolerance' contains 'species' and 'CTmax' columns
+thermal_tolerance <- df1 %>%
+  select(c(7,10:11))
+
+# Merge the datasets by species - redo with species richness
+merged_data <- left_join(beta_diversity2, df1shannon, thermal_tolerance, by = c("genus_species")) %>% drop_na()
+
+plot_data <- merged_data %>%
+  filter(year >= 1960 & year <= 2010) %>%  # Optional: filter for relevant years
+  group_by(region, genus_species, year) %>% 
+  summarise(
+    temp_min = mean(temp_min, na.rm = TRUE),
+    temp_max = mean(temp_max, na.rm = TRUE),
+    mean_sst = mean(mean_sst, na.rm = TRUE),
+    bc_dist_mean = mean(bc_dist_mean, na.rm = TRUE)) %>% 
+  ungroup()
+
+## remove data if 
+ggplot(plot_data, aes(x = genus_species)) +
+  geom_segment(aes(xend = genus_species, y = temp_min, yend = temp_max),
+               color = "skyblue", linewidth = 1.5) +
+  geom_point(aes(y = mean_sst), color = "orange", size = 3) +
+  #geom_point(aes(y = species_richness), color = "red", size = 2, alpha = 0.7) +
+  facet_wrap(~region, scales = "free_x") +  # Facet by region
+  labs(x = "Species",
+       y = "Temperature (°C) / Bray-Curtis Distance",
+       title = "Thermal Breadth, Mean SST, and Bray-Curtis Distance by Species",
+       caption = "Blue bars: Thermal breadth (Temp Min to Max)\nOrange points: Mean SST\nRed points: Bray-Curtis Distance") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+        panel.grid.major = element_line(color = "gray80"),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 12))
+
+{
+  # 3. Statistical analysis
+  # Compute correlation between beta diversity and thermal tolerance
+  cor_test <- cor.test(merged_data$bc_dist_mean, merged_data$temp_max, method = "pearson")
+  
+  # Output the correlation result
+  cat("Correlation between Beta Diversity and Thermal Tolerance:", cor_test$estimate, "\n")
+  cat("p-value:", cor_test$p.value, "\n")
+  
+  # Optional: Regression analysis
+  lm_model <- lm(bc_dist_mean ~ temp_max, data = merged_data)
+  summary(lm_model)  # Get the summary of the regression model
   }

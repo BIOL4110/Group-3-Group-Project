@@ -148,12 +148,13 @@ mean_sst <- sst_obs3 %>%
   #calculate mean SST by year in tropical region
   summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
 
+# redo linear analysis 
+
 ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
   geom_point(aes(shape = region, colour = region), size = 5) + 
   scale_color_brewer(palette = "Set2") +
   geom_smooth(method = "lm", se = TRUE, linewidth = 3) + 
-  facet_wrap(~region, scales = "free_y") + 
-  geom_text(data = subset(mean_sst, region == "Tropical"), 
+  facet_wrap(~factor(region, levels = c("Tropical", "Temperate")), scales = "free_y") +  geom_text(data = subset(mean_sst, region == "Tropical"), 
             aes(x = 1990, y = max(mean_sst) + 0.25, 
                 label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
             color = "black", size = 6, inherit.aes = FALSE) +
@@ -161,6 +162,8 @@ ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
             aes(x = 1990, y = max(mean_sst) + 0.25, 
                 label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
             color = "black", size = 6, inherit.aes = FALSE) +
+  annotate("text", x = 1985, y = max(mean_sst) + 1, label = "a", 
+           size = 10, fontface = "bold") +
   xlab("Year") +
   ylab("Mean SST (°C)") +
   theme_bw(base_size = 14) +
@@ -171,9 +174,9 @@ ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
         axis.title = element_text(size = 30),      
         legend.position = "none") +
   guides(size = "none", shape = guide_legend(override.aes = list(size = 5))) +
-  labs(colour = "Region", shape = "Region") + ggsave("figures/mean_sst_overtime.png", width = 20, height = 10, dpi = 300)
+  labs(colour = "Region", shape = "Region") #+ ggsave("figures/mean_sst_overtime.png", width = 20, height = 10, dpi = 300)
 
-# Panel (a): Map with Hexagonal Binning
+# Panel (a): Map with Hexagonal Binning ----
 # Load the world map
 world <- ne_countries(scale = "medium", returnclass = "sf")
 

@@ -11,6 +11,7 @@ library(stringr)
 library(lme4)
 library(ggpmisc)
 library(viridis)
+library(patchwork)
 
 # SETUP ----
 b <- read_csv("data-processed/btfbsst_without_NA.csv")
@@ -33,8 +34,7 @@ df1 <- left_join(b2,df2, by = c("year", "mean_sst", "region", "genus_species"))
 
 #cross reference genus_species by fishbase_name - not all match so how do we fix?
 ## is it false bc it has an underscore - check 
-# beta diversity; COMPARE TO TEMP ----
-{   
+# beta diversity ----
 beta_diversity <- df1 %>%
   group_by(region, year) %>%
   summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
@@ -45,7 +45,7 @@ beta_diversity %>%
  filter(year >= 1970 & year <= 2010) %>% 
   ggplot(aes(x = factor(year), y = bc_dist_mean, color = region, group = region)) +
   geom_line(linewidth = 6) +
-  geom_smooth(method = "lm", se = TRUE)+
+  geom_smooth(method = "lm", se = TRUE, linewidth = 3)+
   facet_wrap(~region, scales = "free") +
   labs(x = "Year", y = "Bray-Curtis Distance") +
   scale_color_brewer(palette = "Set2") +
@@ -59,10 +59,12 @@ beta_diversity %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         panel.grid.major = element_line(color = "gray80"),
         panel.grid.minor = element_blank(),
-        text = element_text(size = 30), 
-        axis.text = element_text(size = 17), 
+        text = element_text(size = 35), 
+        axis.text = element_text(size = 19), 
         axis.title = element_text(size = 30),      
-        legend.position = "none") + ggsave("figures/BetaDiversity.png", width = 30, height = 15, dpi = 300)
+        legend.position = "none",
+        strip.text = element_text(size = 30, face = "bold")) #+ ggsave("figures/BetaDiversityFINAL.png", width = 30, height = 15, dpi = 300)
+
 
 # Run the linear model and extract p-values and coefficients for each region
 trop <- beta_diversity %>% 
@@ -75,79 +77,9 @@ lm_temp <- lm(bc_dist_mean ~ year, temp)
 summary(lm_temp)
 trop_sum <- tidy(lm_trop)
 temp_sum <- tidy(lm_temp)
-} # done 
-    
-#Compare beta diversity to thermal tolerance of different species
-# Assuming 'beta_diversity' has species and community data, 
-beta_diversity2 <- df1 %>%
-  group_by(region, year, genus_species) %>%
-  summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
-            .groups = "drop") %>%
-  drop_na(bc_dist_mean)
 
-# and 'thermal_tolerance' contains 'species' and 'CTmax' columns
-thermal_tolerance <- df1 %>%
-  select(c(7,10:11, 14:17))
-
-# Merge the datasets by species - redo with species richness
-merged_data <- left_join(beta_diversity2, thermal_tolerance, by = c("genus_species")) %>% drop_na()
-
-#relationship between species richness and Thermal Tolerance (CTmax) - not working 
-ggplot(merged_data, aes(x = mean_sst, y = species_richness, group = temp_max)) +
-  geom_boxplot()+
-  facet_wrap(~region, scales = "free")+
-  labs(x = "Critical Thermal Maximum (CTmax)", y = "species richness") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-#geom_point(aes(color = region), size = 3, alpha = 0.7) +  # Scatter plot of CTmax vs. beta diversity
-#geom_smooth(method = "lm", se = TRUE, color = "blue") +  # Linear regression line
-
-plot_data <- merged_data %>%
-  filter(year >= 1960 & year <= 2010) %>%  # Optional: filter for relevant years
-  group_by(region, genus_species, year) %>% 
-  summarise(
-    temp_min = mean(temp_min, na.rm = TRUE),
-    temp_max = mean(temp_max, na.rm = TRUE),
-    mean_sst = mean(mean_sst, na.rm = TRUE),
-    bc_dist_mean = mean(bc_dist_mean, na.rm = TRUE)) %>% 
-  ungroup()
-
- ## remove data if 
-ggplot(plot_data, aes(x = genus_species)) +
-  geom_segment(aes(xend = genus_species, y = temp_min, yend = temp_max),
-               color = "skyblue", linewidth = 1.5) +
-  geom_point(aes(y = mean_sst), color = "orange", size = 3) +
-  #geom_point(aes(y = species_richness), color = "red", size = 2, alpha = 0.7) +
-  facet_wrap(~region, scales = "free_x") +  # Facet by region
-  labs(x = "Species",
-    y = "Temperature (°C) / Bray-Curtis Distance",
-    title = "Thermal Breadth, Mean SST, and Bray-Curtis Distance by Species",
-    caption = "Blue bars: Thermal breadth (Temp Min to Max)\nOrange points: Mean SST\nRed points: Bray-Curtis Distance") +
-  theme_minimal(base_size = 14) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
-    panel.grid.major = element_line(color = "gray80"),
-    panel.grid.minor = element_blank(),
-    text = element_text(size = 12))
-
-{
-# 3. Statistical analysis
-# Compute correlation between beta diversity and thermal tolerance
-cor_test <- cor.test(merged_data$bc_dist_mean, merged_data$temp_max, method = "pearson")
-
-# Output the correlation result
-cat("Correlation between Beta Diversity and Thermal Tolerance:", cor_test$estimate, "\n")
-cat("p-value:", cor_test$p.value, "\n")
-
-# Optional: Regression analysis
-lm_model <- lm(bc_dist_mean ~ temp_max, data = merged_data)
-summary(lm_model)  # Get the summary of the regression model
-}
-
-# Calculate Shannon diversity ; match to species ----
-{
-#for each group (species richness over time) 
-# Assuming you group data by region and year for diversity calculation
+# Calculate Shannon diversity  ----
+#shannon diversity raw
 shannon_div <- df1 %>%
   group_by(region, year) %>%
   summarise(Shannon = diversity(abundance, index = "shannon"))
@@ -173,12 +105,49 @@ df1_shannon <- df1 %>%
   group_by(year, region) %>%
   summarise(shannon_div = -sum((species_richness / sum(species_richness)) * log(species_richness / sum(species_richness)), na.rm = TRUE))
 
+# Shannon diversity separated by region
 library(gridExtra)
 library(RColorBrewer)
 library(grid)
 
+shannon <- df1_shannon %>%
+  filter(year >= 1967, year <= 2010, 
+         region %in% c("Tropical", "Temperate"), 
+         shannon_div >= 1)
+
+shannon %>%
+  ggplot(aes(x = year, y = shannon_div, color = region)) + 
+  geom_smooth(method = "lm", se = TRUE, linewidth = 5) +
+  geom_point(size = 6, alpha = 0.7) +
+  facet_wrap(~region, scale = "free") +
+  scale_color_brewer(palette = "Set2") +
+  scale_x_continuous(breaks = seq(min(df1_shannon$year), max(df1_shannon$year), by = 1)) +
+  geom_text(data = subset(shannon, region == "Temperate"), 
+            aes(x = 1995, y = max(shannon_div) + 0.50, label = "y = 0.0655x + -125.1170, R² = 0.394, p < 0.05"), 
+            color = "black", size = 12, inherit.aes = FALSE) +
+  geom_text(data = subset(shannon, region == "Tropical"), 
+            aes(x = 2006, y = max(shannon_div) + 0.90, label = "y = 0.1484x + -292.1347, R² = 0.543, p < 0.05"), 
+            color = "black", size = 12, inherit.aes = FALSE) +
+  xlab("Year") +
+  ylab ("Shannon Diversity Index")+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_line(color = "gray80"),
+      panel.grid.minor = element_blank(),
+      text = element_text(size = 35), 
+      axis.text = element_text(size = 19), 
+      axis.text.y = element_text(size = 25),
+      axis.title = element_text(size = 30),      
+      legend.position = "none",
+      strip.text = element_text(size = 30, face = "bold")) + ggsave("figures/ShannonDiversityFINAL.png", width = 30, height = 15, dpi = 300)
+
 tropical_plot <- df1_shannon %>%
-  filter(year <= 2010, region == "Tropical", shannon_div >= 1) %>%
+  filter(year <= 2010, region == "Tropical", shannon_div >= 1)
+
+troplm <- lm(shannon_div ~ year, data = tropical_plot)
+summary(troplm)
+
+tropical_plot %>%
   ggplot(aes(x = year, y = shannon_div, color = region)) + 
   geom_smooth(method = "lm", se = TRUE, linewidth = 4) +
   geom_point(size = 4, alpha = 0.7) +
@@ -198,7 +167,12 @@ tropical_plot <- df1_shannon %>%
     legend.position = "none")
 
 temperate_plot <- df1_shannon %>%
-  filter(year <= 2010, region == "Temperate", shannon_div >= 1) %>%
+  filter(year <= 2010, region == "Temperate", shannon_div >= 1) 
+
+templm <- lm(shannon_div ~ year, data = temperate_plot)
+summary(templm)
+
+temperate_plot %>%
   ggplot(aes(x = year, y = shannon_div, color = region)) + 
   geom_smooth(method = "lm", se = TRUE, linewidth = 4) +
   geom_point(size = 4, alpha = 0.7) +
@@ -230,40 +204,13 @@ combined <- grid.arrange(arrangeGrob(grobs = list(temperate_plot, tropical_plot)
   bottom = x_axis_label) 
 
 ggsave(filename = "figures/shannon_diversity2.png", plot = combined, width = 30, height = 15, dpi = 300)
-} # done
 
-# macth df1shnnon to species 
-merged2 <- left_join(df1_shannon, thermal_tolerance, by = "year")
-plot_data <- merged2 %>%
-  filter(year >= 1960 & year <= 2010) %>%  # Optional: filter for relevant years
-  group_by(region, year) %>% 
-  summarise(
-    temp_min = mean(temp_min, na.rm = TRUE),
-    temp_max = mean(temp_max, na.rm = TRUE),
-    mean_sst = mean(mean_sst, na.rm = TRUE)) %>% 
-  ungroup()
+# species richness by sst- finish  ----
 
-# Plot
-ggplot(plot_data, aes(x = genus_species)) +
-  geom_segment(aes(xend = genus_species, y = temp_min, yend = temp_max),
-               color = "skyblue", linewidth = 1.5) +
-  geom_point(aes(y = mean_sst), color = "orange", size = 3) +
-  #geom_point(aes(y = species_richness), color = "red", size = 2, alpha = 0.7) +
-  facet_wrap(~region, scales = "free_x") +  # Facet by region
-  labs(
-    x = "Species",
-    y = "Temperature (°C) / Bray-Curtis Distance",
-    title = "Thermal Breadth, Mean SST, and Bray-Curtis Distance by Species",
-    caption = "Blue bars: Thermal breadth (Temp Min to Max)\nOrange points: Mean SST\nRed points: Bray-Curtis Distance"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
-    panel.grid.major = element_line(color = "gray80"),
-    panel.grid.minor = element_blank(),
-    text = element_text(size = 12)
-  )
-# species richness by sst- finish LMs ----
+# Merge the datasets by species - redo with species richness
+merged_data <- left_join(df1, df1_shannon, by = c("year", "region")) %>% drop_na()
+
+# pvalue wrong???
 trop <- merged_data %>%
   filter(region == "Tropical") %>%
   group_by(year, mean_sst) %>%
@@ -275,7 +222,7 @@ summary(lm_model)
 p_value <- summary(lm_model)$coefficients[2, 4]  # p-value for mean_sst
 p_value_display <- ifelse(p_value < 0.05, "< 0.05", paste("= ", round(p_value, 4)))
 
-# Create the plot with p-value in the caption
+# lines not showing 
 ggplot(trop, aes(x = mean_sst, y = mean_species_richness, colour = mean_species_richness)) + 
   geom_jitter(alpha = 0.7, size = 4) + 
   geom_smooth(method = "lm", se = TRUE, color = "darkblue", linewidth = 2) + 
@@ -326,6 +273,7 @@ temp_data_25_30 <- temp_data %>%
   filter(mean_sst >= 25 & mean_sst <= 30) %>%
   rename(sst25 = mean_sst, msr25 = mean_species_richness)
 
+## STOPS WORKING HERE
 # Combine the two datasets
 combined_temp_data <- temp_data_0_20 %>%
   full_join(temp_data_25_30, by = "year")
@@ -425,83 +373,3 @@ change25 <- temp_data_25_30 %>%
 lm_model25 <- lm(msr25 ~ sst25, data = temp_data_25_30)
 summary(lm_model)
 
-# logged abundance code- eh not really working ---- 
-
-# Step 1: Calculate Topt as the midpoint of Tmin and Tmax (or customize as needed)
-df2 <- df1 %>%
-  mutate(Topt = (temp_min + temp_max) / 2)
-
-# Step 2: Log-transform abundance
-df2 <- df2 %>%
-  mutate(log_abundance = log(abundance + 1))  # Avoid log(0)
-
-# Step 3: Fit a TPC curve (e.g., Gaussian or quadratic fit)
-tpc_fits <- df2 %>%
-  group_by(region, genus_species) %>%
-  filter(n_distinct(mean_sst) > 2) %>%  # Ensure at least 3 unique points for a quadratic fit
-  summarise(fit = list(lm(log_abundance ~ poly(mean_sst, 2))), .groups = "drop")
-
-# Step 2: Extract the fitted TPC curves
-tpc_predictions <- tpc_fits %>%
-  mutate(predictions = map(fit, ~ {
-    data.frame(mean_sst = seq(min(df2$mean_sst, na.rm = TRUE), 
-                              max(df2$mean_sst, na.rm = TRUE), length.out = 100),
-               fitted_values = predict(.x, 
-                                       newdata = data.frame(mean_sst = seq(min(df2$mean_sst, na.rm = TRUE), 
-                                                                           max(df2$mean_sst, na.rm = TRUE), length.out = 100))))
-  })) %>%
-  unnest(predictions)
-
-df2_topt <- df2 %>%
-  group_by(region, genus_species) %>%
-  summarise(
-    t_opt = mean(mean_sst[log_abundance == max(log_abundance, na.rm = TRUE)]),
-    .groups = "drop"
-  )
-
-# Step 2: Merge Topt with the original dataframe
-df2 <- df2 %>%
-  left_join(df2_topt, by = c("region", "genus_species"))
-
-# Step 3: Create the plot
-df2 %>%
-  ggplot(aes(x = mean_sst, y = log_abundance, color = genus_species)) +
-  geom_point(alpha = 0.6, size = 3) + 
-  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, linewidth = 1) +  # Quadratic fit
-  geom_vline(aes(xintercept = t_opt), linetype = "dashed", color = "orange", linewidth = 1) +  # Topt line
-  facet_wrap(~region, scales = "free", ncol = 1) +  # Facet by region and species
-  labs(x = "Temperature (°C)", 
-       y = "Log Abundance", 
-       title = "Abundance vs. Temperature with Topt") +
-  scale_color_brewer(palette = "Set2") +
-  theme_minimal() +
-  theme(strip.text = element_text(size = 14, face = "bold"), 
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14),
-    legend.position = "none")
-
-
-
-
-# HYPOTHESIS ONE - done not using ----
-## total abundance change over time by region - done not using 
-{
-  df1 %>%
-    filter(total_abundance <= 5000) %>% # Filter outliers - heighest is 40 000 but are major outliers
-    ggplot(aes(x = factor(year), y = total_abundance, color = region, group = region)) + 
-    geom_point(size = 2.5, alpha = 0.7) +
-    geom_smooth(method = "loess") +
-    facet_wrap(~region, scales = "free") + 
-    scale_color_brewer(palette = "Set2") +
-    labs(x = "Year", 
-         y = "Total Abundance",
-         color = "Region") +
-    theme_minimal(base_size = 14)+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          panel.grid.major = element_line(color = "gray80"),
-          panel.grid.minor = element_blank(),
-          text = element_text(size = 30), 
-          axis.text = element_text(size = 10), 
-          axis.title = element_text(size = 30),
-          legend.position = "none") #+ ggsave("figures/TotalAbundance.png", width = 25, height = 15, dpi = 300)
-}
