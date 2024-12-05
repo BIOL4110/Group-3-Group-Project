@@ -15,6 +15,7 @@ library(patchwork)
 library(gridExtra)
 library(RColorBrewer)
 library(grid)
+library(viridis)
 
 # SETUP ----
 b <- read_csv("data-processed/btfbsst_without_NA.csv")
@@ -154,9 +155,10 @@ shannon %>%
 
 # species richness by sst- finish  ----
 # Merge the datasets by species - redo with species richness
-merged_data <- left_join(df1, df1_shannon, by = c("year", "region")) %>% drop_na()
+merged_data <- left_join(beta_diversity2, df1, by = c("genus_species", "year", "region")) %>% drop_na()
 
-# pvalue wrong???
+# tropical pvalue wrong???
+{
 trop <- merged_data %>%
   filter(region == "Tropical") %>%
   group_by(year, mean_sst) %>%
@@ -202,12 +204,34 @@ change_data <- trop %>%
     percentage_change_richness = round((change_richness / first_year_richness) * 100, 2))
 ## change in sst -0.5275974 # 1.8% decrease
 # change richness 7.37382 63% increase
+}
 
 temp_data <- merged_data %>%
   filter(region == "Temperate") %>%
   group_by(year, mean_sst) %>%
   summarise(mean_species_richness = mean(species_richness, na.rm = TRUE), .groups = "drop") %>%
   ungroup()
+
+temp_data %>%
+  ggplot(aes(x = mean_sst, y = mean_species_richness, colour = mean_species_richness)) + 
+  geom_jitter(alpha = 0.7) + 
+  geom_smooth(method = "lm", se = TRUE, color = "blue") + 
+  scale_color_viridis(option = "D") +
+  facet_wrap(~year, scales = "free_x") +  # Facet wrap for selected years
+  labs(x = "Mean SST°C", 
+       y = "Average Species Richness", 
+       title = "Temperate (10-20°C)",
+       caption = paste0(
+         "SST % Change: ", round(change$percentage_change_sst, 2), "%\n",
+         "Species Richness % Change: ", round(change$percentage_change_richness, 2), "%\n",
+         "p-value = <0.05")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(hjust = 1, size = 18),
+        text = element_text(size = 18),
+        axis.title = element_text(size = 25),
+        plot.title = element_text(hjust = 0.5, size = 30),
+        plot.caption = element_text(hjust = 1, vjust = 15, size = 20),
+        legend.position = "none")
 
 # Filter for SST 0-20°C
 temp_data_0_20 <- temp_data %>%

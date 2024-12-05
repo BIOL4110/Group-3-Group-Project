@@ -130,13 +130,6 @@ full_harm_btfbsst_clean <- full_harm_btfbsst_clean %>%
 
 # PLOTTING SEA SURFACE TEMPERATURES RISING OVER THE YEARS  ----
 ## only summer months
-sst_trend_model <- lm(mean_sst ~ year, data = mean_sst)
-summary(sst_trend_model)
-
-# Extract the slope (coefficient of year)
-slope <- coef(sst_trend_model)["year"]
-cat("The slope of the trend line is:", slope, "°C per year\n")
-#positive slope of 0.01C per year - temp increasing that much every year 
 
 sst_obs3 <- read_csv("data-processed/extracted_sst.csv")
 
@@ -148,33 +141,51 @@ mean_sst <- sst_obs3 %>%
   #calculate mean SST by year in tropical region
   summarize(mean_sst = mean(mean_summer_sst_degC, na.rm = TRUE))
 
-# redo linear analysis 
+sst_trend_model <- lm(mean_sst ~ year, data = mean_sst)
+summary(sst_trend_model)
 
-ggplot(mean_sst, aes(x = year, y = mean_sst, group = region)) +
-  geom_point(aes(shape = region, colour = region), size = 5) + 
+# Extract the slope (coefficient of year)
+slope <- coef(sst_trend_model)["year"]
+cat("The slope of the trend line is:", slope, "°C per year\n")
+#positive slope of 0.01C per year - temp increasing that much every year 
+
+# do linear analysis for each region 
+tropical <- mean_sst %>%
+  filter(region == "Tropical")
+tropicallm <- lm(mean_sst ~ year, data = tropical)
+summary(tropicallm)
+
+temperate <- mean_sst %>%
+  filter(region == "Temperate")
+temperatelm <- lm(mean_sst ~ year, data = temperate)
+summary(temperatelm)
+
+mean_sst %>%
+  ggplot(aes(x = year, y = mean_sst, group = region)) +
+  geom_point(aes(colour = region), size = 6, alpha = 0.7) + 
   scale_color_brewer(palette = "Set2") +
   geom_smooth(method = "lm", se = TRUE, linewidth = 3) + 
-  facet_wrap(~factor(region, levels = c("Tropical", "Temperate")), scales = "free_y") +  geom_text(data = subset(mean_sst, region == "Tropical"), 
+  facet_wrap(~region, scales = "free") +
+  #facet_wrap(~factor(region, levels = c("Tropical", "Temperate")), scales = "free_y") +  
+  geom_text(data = subset(mean_sst, region == "Tropical"), 
             aes(x = 1990, y = max(mean_sst) + 0.25, 
-                label = "y = 0.013803x + 0.276293, R² = 0.644, p < 0.05"), 
-            color = "black", size = 6, inherit.aes = FALSE) +
+                label = "y = 0.013803x + 0.276293, R² = 0.664, p < 0.05"), 
+            color = "black", size = 8, inherit.aes = FALSE) +
   geom_text(data = subset(mean_sst, region == "Temperate"), 
             aes(x = 1990, y = max(mean_sst) + 0.25, 
                 label = "y = 0.020160x - 23.054953, R² = 0.7326, p < 0.05"), 
-            color = "black", size = 6, inherit.aes = FALSE) +
-  annotate("text", x = 1985, y = max(mean_sst) + 1, label = "a", 
-           size = 10, fontface = "bold") +
+            color = "black", size = 8, inherit.aes = FALSE) +
   xlab("Year") +
   ylab("Mean SST (°C)") +
   theme_bw(base_size = 14) +
-  theme(panel.grid.major = element_line(color = "gray80"),
+  theme(axis.text.x = element_text(hjust = 1),
+        panel.grid.major = element_line(color = "gray80"),
         panel.grid.minor = element_blank(),
-        text = element_text(size = 30), 
+        text = element_text(size = 35), 
         axis.text = element_text(size = 25), 
         axis.title = element_text(size = 30),      
-        legend.position = "none") +
-  guides(size = "none", shape = guide_legend(override.aes = list(size = 5))) +
-  labs(colour = "Region", shape = "Region") #+ ggsave("figures/mean_sst_overtime.png", width = 20, height = 10, dpi = 300)
+        legend.position = "none",
+        strip.text = element_text(size = 30, face = "bold")) #+ ggsave("figures/meansstFINAL.png", width = 20, height = 10, dpi = 300)
 
 # Panel (a): Map with Hexagonal Binning ----
 # Load the world map
