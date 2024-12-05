@@ -21,12 +21,23 @@ anyNA(btfbsst_analysis$temp_min)
 ## Create new column thermal tolerance range of species 
 
  btfbsst_wthermtol<- btfbsst_analysis %>% 
-  mutate('thermal_range' = temp_max - temp_min)
+  mutate('thermal_range' = temp_max - temp_min) 
+ 
+ # Calculate the correlation between thermal_range and temp_max
+ correlation <- cor(slopes$thermal_range, slopes$temp_max, use = "complete.obs")
+ print(paste("Correlation between thermal_range and temp_max:", correlation))
+ #High correlation: 0.949
 
 ## Create two seperate datasets for tropical and temperate fish
  ###TROPICAL
  tropical_h2_data <- btfbsst_wthermtol %>% 
    filter(region == "Tropical")
+ 
+ # Calculate average thermal tolerance range for tropical region
+ avg_trop_tolerance <- tropical_h2_data %>%
+   summarise(avg_tolerance_range = mean(thermal_range, na.rm = TRUE))
+ 
+ print(avg_trop_tolerance)
  
  #Determine number of unique tropical species
  num_species <- tropical_h2_data %>%
@@ -36,6 +47,12 @@ anyNA(btfbsst_analysis$temp_min)
  ###TEMPERATE
   temperate_h2_data <- btfbsst_wthermtol %>% 
    filter(region == "Temperate") 
+  
+  # Calculate average thermal tolerance range for tropical region
+  avg_temp_tolerance <- temperate_h2_data %>%
+    summarise(avg_tolerance_range = mean(thermal_range, na.rm = TRUE))
+  
+  print(avg_temp_tolerance)
  
    #Determine number of unique temperate species
   num_species2 <- temperate_h2_data %>%
@@ -53,6 +70,10 @@ anyNA(btfbsst_analysis$temp_min)
  fishbase_tropgraphed <- fb_trop %>%
    select(fishbase_name, temp_max, temp_min) %>%
    pivot_longer(cols = c(temp_max, temp_min), names_to = "thermal_tolerance", values_to = "Temperature")
+ 
+ #Order fishbase_name alphabetically
+ fishbase_tropgraphed <- fishbase_tropgraphed %>%
+   mutate(fishbase_name = factor(fishbase_name, levels = sort(unique(fishbase_name))))
  
  # Plot the tropical thermal tolerance graph
  # Add a gradient scale for temperature
@@ -81,6 +102,10 @@ anyNA(btfbsst_analysis$temp_min)
  fishbase_tempgraphed <- fb_temp %>%
    select(fishbase_name, temp_max, temp_min) %>%
    pivot_longer(cols = c(temp_max, temp_min), names_to = "thermal_tolerance", values_to = "Temperature")
+
+  #Order fishbase_name alphabetically
+ fishbase_tempgraphed <- fishbase_tempgraphed %>%
+   mutate(fishbase_name = factor(fishbase_name, levels = sort(unique(fishbase_name))))
  
  ggplot(fishbase_tempgraphed, aes(x = fishbase_name)) +
    # Add points for temp_min and temp_max
@@ -121,7 +146,7 @@ anyNA(btfbsst_analysis$temp_min)
     geom_point(alpha = 0.6) +  # Scatterplot of abundance over time
     geom_smooth(method = "lm", se = FALSE, aes(group = fishbase_name), size = 1) +  # Add regression lines
     labs(
-      title = "Abundance Slopes Over Time for Each Location for Tropical Region",
+      title = "Abundance Over Time for Each Location for Tropical Region",
       x = "Year",
       y = "Abundance",
       color = "Species") +
@@ -153,6 +178,7 @@ anyNA(btfbsst_analysis$temp_min)
       slope = coef(lm(abundance ~ year, data = pick(everything())))[2], # Extract slope
       thermal_range = first(thermal_range), # Include thermal range
       temp_max = first(temp_max),          # Include temp_max (CTmax)
+      abundance =first(abundance),
       .groups = "drop")                  # Ungroup after summarising
   
   # Determine number of unique species we will be analyzing (just an FYI) - Tropical has 10 species total
@@ -192,7 +218,7 @@ anyNA(btfbsst_analysis$temp_min)
   # Plot Abundance Trends - abundance at each location with slopes visualized as the colour of the lines
   ggplot(filtered_data, aes(x = year, y = abundance, group = interaction(location, fishbase_name), color = slope)) +
     geom_line(alpha = 0.7, size = 0.8) +
-    scale_color_gradientn(colors = c("blue", "white", "red"), name = "Slope") +
+    scale_color_gradientn(colors = c("blue", "yellow", "green"), name = "Slope") +
     labs(
       title = "Abundance Trends Over Time by Location for Tropical Region",
       x = "Year",
@@ -210,6 +236,7 @@ anyNA(btfbsst_analysis$temp_min)
               by = c("location", "fishbase_name")) 
   model_tropical
   
+  # D. Fit the model 
   model1 <- lm(slope ~ thermal_range.x + temp_max.x, data = model_tropical)
   summary(model1)
   
@@ -225,7 +252,6 @@ anyNA(btfbsst_analysis$temp_min)
       y = "Slope of Abundance") +
     theme_minimal()
   
-  
   # Scatterplot of slope vs CTmax
   ggplot(slopes, aes(x = temp_max, y = slope)) +
     geom_point(size = 2, color = "blue", alpha = 0.7) +
@@ -235,6 +261,74 @@ anyNA(btfbsst_analysis$temp_min)
       x = "CTmax (°C)",
       y = "Slope of Abundance") +
     theme_minimal()
+  
+  # Graph for Paper - Scale colour changed, dates fixed and filtered to include only models with trendlines/abundance slopes
+  # Merge slopes into the dataset for plotting
+  abundance_with_slopes <- tropical_h2_analysis %>%
+    left_join(slopes, by = c("location", "fishbase_name")) 
+  
+  # Plot abundance data and slope trend lines
+  ggplot(abundance_with_slopes, aes(x = year, y = abundance.x, color = fishbase_name)) + # Points for abundance data
+    geom_point(alpha = 0.6) +  # Line showing the slope
+    geom_smooth(method = "lm", se = FALSE, aes(group = interaction(location, fishbase_name)), size = 1, linetype = "solid") +# Customize labels and legend
+    scale_color_viridis_d(name = "Species") +
+    scale_x_continuous(breaks = seq(floor(min(abundance_with_slopes$year)), ceiling(max(abundance_with_slopes$year)), 2)) + # Set breaks for whole years
+    labs(
+      title = "Abundance Trends Over Time for Tropical Species",
+      x = "Year",
+      y = "Abundance",
+      color = "Species") + # Facet by location
+    facet_wrap(~ location, scales = "free_y") + # Theme adjustments
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "bottom")
+  
+  # Filter locations that have valid slopes (non-NA)
+  filtered_data_with_slopes <- abundance_with_slopes %>%
+    filter(!is.na(slope)) # Remove rows where slope is NA
+  
+  # Plot Abundance Trends - Only locations with valid slopes
+  
+  trop_abundance_plot <- ggplot(filtered_data_with_slopes, aes(x = year, y = abundance.x, color = fishbase_name)) +
+    geom_point(alpha = 0.6) +  
+    geom_smooth(method = "lm", se = FALSE, aes(group = interaction(location, fishbase_name)), size = 1) +
+    scale_color_viridis_d(name = "Species") +
+    scale_x_continuous(breaks = seq(floor(min(filtered_data_with_slopes$year)), ceiling(max(filtered_data_with_slopes$year)), 1)) + # Whole years only
+    labs(
+      title = "Tropical Species Abundance Trends Over Time for Locations with Valid Slopes",
+      x = "Year",
+      y = "Abundance",
+      color = "Species") +
+    facet_wrap(~ location, scales = "free_y") +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "bottom")
+  
+  # Determine p-values
+  
+  # Step 1: Calculate slopes and p-values for each group
+  slopes_with_pvalues <- tropical_h2_analysis %>%
+    group_by(location, fishbase_name) %>%
+    filter(n_distinct(year) > 5) %>%      # Include groups with >5 years of data
+    summarise(
+      slope = coef(lm(abundance ~ year))[2],  # Extract slope
+      p.value = summary(lm(abundance ~ year))$coefficients[2, 4], # Extract p-value for slope
+      .groups = "drop")
+  
+  # Step 2: Determine the number of significant slopes
+  significant_slopes <- slopes_with_pvalues %>%
+    summarise(
+      total = n(),                           # Total number of slopes
+      significant = sum(p.value < 0.05),     # Count slopes with p-value < 0.05
+      proportion_significant = significant / total * 100) # Percentage of significant slopes
+  
+  # Print results
+  print(significant_slopes)
+  
+ ggsave("plot.png", trop_abundance_plot) 
+  
   
   #######################################
   
@@ -289,7 +383,7 @@ anyNA(btfbsst_analysis$temp_min)
       temp_max = first(temp_max),          # Include temp_max (CTmax)
       .groups = "drop")                  # Ungroup after summarising
   
-  # Determine number of unique species we will be analyzing (just an FYI) - Temperate has X species total
+  # Determine number of unique species we will be analyzing (just an FYI) - Temperate has 14 species total
   num_species3 <- slopes2 %>%
     summarise(unique_species_count = n_distinct(fishbase_name))
   num_species3
@@ -370,41 +464,28 @@ anyNA(btfbsst_analysis$temp_min)
       y = "Slope of Abundance") +
     theme_minimal()
   
-  #NOTE: Same results when doing this with the do() function
-  #Using the do() function to analyze data
-
-  # Step 2: Data Analysis for Hypothesis 2
-  library(broom)
+  # Graph for Paper - Scale colour changed, dates fixed and filtered to include only models with trendlines/abundance slopes
+  # Merge slopes into the dataset for plotting
+  abundance_with_slopes2 <- temperate_h2_analysis %>%
+    left_join(slopes, by = c("location", "fishbase_name")) 
   
-  ##Tropical Data
-  # A. Clean data - create a new column with lat and long combined and round to 2 decimals - Tropical data
+  # Filter locations that have valid slopes (non-NA)
+  filtered_data_with_slopes2 <- abundance_with_slopes2 %>%
+    filter(!is.na(slope)) # Remove rows where slope is NA
   
-  tropical_h2_analysis <- tropical_h2_data %>%
-    mutate(
-      latitude = round(latitude, 2),       # Round latitude to 2 decimals
-      longitude = round(longitude, 2),     # Round longitude to 2 decimals
-      location = paste(latitude, longitude, sep = ", "))
+  # Plot Abundance Trends - Only locations with valid slopes
   
-  #Fit a linear model for each location-species group
-  abundance_models <- tropical_h2_analysis %>%
-    group_by(location, fishbase_name) %>%
-    filter(n_distinct(year) > 5, sum(!is.na(abundance)) > 5) %>%  # Ensure enough data
-    do(model = lm(abundance ~ year, data = .))  # Apply the model
-  
-  # Extract slopes from the models
-  slopes <- abundance_models %>%
-    mutate(slope = coef(model)[["year"]]) %>%  # Extract slope (coefficient for year)
-    select(location, fishbase_name, slope)     # Keep relevant columns
-  
-  # Visualize slopes by location
-  ggplot(slopes, aes(x = location, y = slope, color = slope)) +
-    geom_point(size = 3) +
-    scale_color_gradientn(colors = c("blue", "white", "red"), name = "Slope") +
+  temp_abundance_plot <- ggplot(filtered_data_with_slopes2, aes(x = year, y = abundance.x, color = fishbase_name)) +
+    geom_point(alpha = 0.6) +  
+    geom_smooth(method = "lm", se = FALSE, aes(group = interaction(location, fishbase_name)), size = 1) +
+    scale_color_viridis_d(name = "Species") +
+    scale_x_continuous(breaks = seq(floor(min(filtered_data_with_slopes$year)), ceiling(max(filtered_data_with_slopes$year)), 1)) + # Whole years only
     labs(
-      title = "Abundance Slopes by Location for Tropical Region",
-      x = "Location",
-      y = "Slope of Abundance"
-    ) +
+      title = "Temperate Species Abundance Trends Over Time for Locations with Valid Slopes",
+      x = "Year",
+      y = "Abundance",
+      color = "Species") +
+    facet_wrap(~ location, scales = "free_y") +
     theme_minimal() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
@@ -432,7 +513,63 @@ anyNA(btfbsst_analysis$temp_min)
   
   model1 <- lm(slope ~ thermal_range.x + temp_max.x, data = model_tropical)
   summary(model1)
+  
+  ##########################################
+
+  #Further examination of abundance - are most adundance slopes increasing or decreasing for tropical and temperate regions?
+
+  # Identify whether slopes are increasing and decreasing - TROPICAL
+  # Add a column indicating if the slope is increasing or decreasing
+  slopes_summary <- slopes %>%
+    mutate(slope_direction = ifelse(slope > 0, "Increasing", "Decreasing"))
+  
+  # Count the number of increasing and decreasing slopes
+  slope_summary <- slopes_summary %>%
+    count(slope_direction)
+  
+  #Calculate the percentage of increasing and decreasing slopes
+  slope_summary <- slope_summary %>%
+    mutate(percent = n / sum(n) * 100) 
+  
+  print(slope_summary)
+  
+  #Visualize Trends
+  ggplot(slopes_summary, aes(x = location, y = slope, fill = slope_direction)) +
+    geom_col() +
+    coord_flip() +
+    labs(
+      title = "Abundance Trends by Location",
+      x = "Location",
+      y = "Slope of Abundance",
+      fill = "Trend"
+    ) +
+    theme_minimal()
+  
+  # Identify whether slopes are increasing and decreasing
+  # Add a column indicating if the slope is increasing or decreasing - Temperate
+  slopes_summary2 <- slopes2 %>%
+    mutate(slope_direction = ifelse(slope > 0, "Increasing", "Decreasing"))
+  
+  # Count the number of increasing and decreasing slopes
+  slope_summary2 <- slopes_summary2 %>%
+    count(slope_direction)
+  
+  #Calculate the percentage of increasing and decreasing slopes
+  slope_summary2 <- slope_summary2 %>%
+    mutate(percent = n / sum(n) * 100) 
+  
+  print(slope_summary2)
+  
+  #Visualize Trends
+  ggplot(slopes_summary2, aes(x = location, y = slope, fill = slope_direction)) +
+    geom_col() +
+    coord_flip() +
+    labs(
+      title = "Abundance Trends by Location",
+      x = "Location",
+      y = "Slope of Abundance",
+      fill = "Trend"
+    ) +
+    theme_minimal()
 
   
-  
-  summary(model1)
