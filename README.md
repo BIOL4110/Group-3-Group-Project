@@ -2,9 +2,10 @@
 BIOL 4110 Group Project 
 Ijeoma Nwafor, Lukasz Padiasek, Celeste Landon, Mya Dolanjski and Stuart Bulmer
 
-[Link to the Research Proposal for Group 3](https://github.com/BIOL4110/Group-3-Group-Project/blob/main/Group3-Proposal-Final.pdf)
-
 [Link to the Final Research Paper - Group 3](https://github.com/BIOL4110/Group-3-Group-Project/blob/main/papers-submission/Final_Research_Project_Group3.pdf)
+
+
+[Link to the Research Proposal for Group 3](https://github.com/BIOL4110/Group-3-Group-Project/blob/main/Group3-Proposal-Final.pdf)
 
 Our data can be accessed using the Open Science Framework
 
@@ -20,4 +21,4 @@ We used 4 scripts to analyze our hypotheses
 
 [04-hypothesis2.R](https://github.com/BIOL4110/Group-3-Group-Project/blob/main/r-scripts/04-hypothesis2.R) All code to do with answering hypothesis 2 and generating figures
 
-unsed-script.R Features code we used along the way that did not help us answer our questions directly, but were useful to return to. 
+unsed-script.R  Features code we used along the way that did not help us answer our questions directly, but were useful to return to. 
