@@ -77,7 +77,7 @@ anyNA(btfbsst_analysis$temp_min)
  
  # Plot the tropical thermal tolerance graph
  # Add a gradient scale for temperature
- ggplot(fishbase_tropgraphed, aes(x = fishbase_name)) + # Add points for temp_min and temp_max
+ thermal_tol_trop <- ggplot(fishbase_tropgraphed, aes(x = fishbase_name)) + # Add points for temp_min and temp_max
    geom_point(aes(y = Temperature, color = Temperature), size = 3, alpha = 0.8) + # Add lines for thermal tolerance range
    geom_line(aes(y = Temperature, group = fishbase_name, color = Temperature), size = 1) + # Set a three-color gradient for the legend
    scale_color_gradientn(
@@ -94,6 +94,8 @@ anyNA(btfbsst_analysis$temp_min)
      text = element_text(size = 14),
      legend.position = "right")
 
+ ggsave("thermal_tol_tropFINAL.png", thermal_tol_trop) 
+ 
  #Create the thermal tolerance range plot for temperate species
  fb_temp <- temperate_h2_data %>%
    mutate(fishbase_name = reorder(fishbase_name, thermal_range, FUN = max, order = TRUE))
@@ -127,6 +129,8 @@ anyNA(btfbsst_analysis$temp_min)
      axis.text.x = element_text(angle = 90, hjust = 1, size = 12),
      text = element_text(size = 14),
      legend.position = "right")
+ 
+ ggsave("thermal_tol_tempFINAL.png", thermal_tol_temp) 
   
 # Step 2: Data Analysis for Hypothesis 2
   library(broom)
@@ -327,7 +331,7 @@ anyNA(btfbsst_analysis$temp_min)
   # Print results
   print(significant_slopes)
   
- ggsave("plot.png", trop_abundance_plot) 
+ ggsave("plot.png", trop_abundance_plotFINAL) 
   
   
   #######################################
