@@ -153,45 +153,56 @@ shannon %>%
       legend.position = "none",
       strip.text = element_text(size = 30, face = "bold")) #+ ggsave("figures/ShannonDiversityFINAL.png", width = 30, height = 15, dpi = 300)
 
-# species richness by sst- finish  ----
-# Merge the datasets by species - redo with species richness
-merged_data <- left_join(beta_diversity2, df1, by = c("genus_species", "year", "region")) %>% drop_na()
+# species richness by sst----
+beta_diversity2 <- df1 %>%
+  group_by(region, year, genus_species) %>%
+  summarize(bc_dist_mean = mean(as.vector(vegdist(as.matrix(total_abundance), method = "bray"))),
+            .groups = "drop") %>%
+  drop_na(bc_dist_mean)
 
-# tropical pvalue wrong???
-{
+# and 'thermal_tolerance' contains 'species' and 'CTmax' columns
+thermal_tolerance <- df1 %>%
+  select(c(7,10:11, 14:16))
+
+# Merge the datasets by species - redo with species richness
+merged_data <- left_join(beta_diversity2, thermal_tolerance, by = c("genus_species")) %>% drop_na()
+
 trop <- merged_data %>%
   filter(region == "Tropical") %>%
   group_by(year, mean_sst) %>%
   summarise(mean_species_richness = mean(species_richness, na.rm = TRUE), .groups = "drop") %>%
-  ungroup()
+  ungroup() %>% 
+  filter(!(mean_species_richness > 25 & year >= 2004 & year <= 2008)) 
 
 lm_model <- lm(mean_species_richness ~ mean_sst, data = trop)
 summary(lm_model)
 p_value <- summary(lm_model)$coefficients[2, 4]  # p-value for mean_sst
 p_value_display <- ifelse(p_value < 0.05, "< 0.05", paste("= ", round(p_value, 4)))
 
-# lines not showing 
-ggplot(trop, aes(x = mean_sst, y = mean_species_richness, colour = mean_species_richness)) + 
-  geom_jitter(alpha = 0.7, size = 4) + 
+# Create the plot with p-value in the caption
+trop_plot <- ggplot(trop, aes(x = mean_sst, y = mean_species_richness, colour = mean_species_richness)) + 
+  geom_jitter(alpha = 0.7, size = 5) + 
   geom_smooth(method = "lm", se = TRUE, color = "darkblue", linewidth = 2) + 
-  facet_wrap(~year) +
+  facet_wrap(~year, scales = "free") +
   scale_color_viridis(option = "D") +
   labs(x = "Mean SST°C", 
-    y = "Average Species Richness", 
-    title = "Tropical",
-    caption = paste0(
-      "SST % Change: ", round(change_data$percentage_change_sst, 2), "%\n",
-      "Species Richness % Change: ", round(change_data$percentage_change_richness, 2), "%\n",
-      "p-value = ", p_value_display)) +
+       y = "Average Species Richness", 
+       title = "Tropical",
+       caption = paste0(
+         "SST % Change: ", round(change_data$percentage_change_sst, 2), "%\n",
+         "Species Richness % Change: ", round(change_data$percentage_change_richness, 2), "%\n",
+         "p-value = ", p_value_display)) +
   theme_bw() +
-  theme(axis.text.x = element_text(hjust = 1, size = 15),
-    text = element_text(size = 18),
-    axis.title = element_text(size = 25),
-    plot.title = element_text(hjust = 0.5, size = 30),
-    plot.caption = element_text(hjust = 1, vjust = 15, size = 20),
-    legend.position = "none") #+ ggsave("figures/tropical_sst_speciesrich.png", width = 20, height = 10, dpi = 300)
+  theme(axis.text.x = element_text(hjust = 1, size = 16, angle = 35),
+        text = element_text(size = 18),
+        axis.title = element_text(size = 25),
+        axis.text.y = element_text(size = 18),
+        plot.title = element_text(hjust = 0, size = 35, face = "bold"),
+        plot.caption = element_text(hjust = 1, vjust = 5, size = 20),
+        legend.position = "none",
+        strip.text = element_text(size = 18, face = "bold"))
 
-#clculate change of avg species richness and mean sst from first to last year and how to plot that
+#calculate change of avg species richness and mean sst from first to last year and how to plot that
 change_data <- trop %>%
   summarise(
     first_year_sst = mean(mean_sst[year == min(year)], na.rm = TRUE),
@@ -199,39 +210,18 @@ change_data <- trop %>%
     first_year_richness = mean(mean_species_richness[year == min(year)], na.rm = TRUE),
     last_year_richness = mean(mean_species_richness[year == max(year)], na.rm = TRUE)) %>%
   mutate(change_sst = last_year_sst - first_year_sst,
-    change_richness = last_year_richness - first_year_richness,
-    percentage_change_sst = round((change_sst / first_year_sst) * 100, 2),
-    percentage_change_richness = round((change_richness / first_year_richness) * 100, 2))
+         change_richness = last_year_richness - first_year_richness,
+         percentage_change_sst = round((change_sst / first_year_sst) * 100, 2),
+         percentage_change_richness = round((change_richness / first_year_richness) * 100, 2))
 ## change in sst -0.5275974 # 1.8% decrease
 # change richness 7.37382 63% increase
-}
 
+#TEMPERATE
 temp_data <- merged_data %>%
   filter(region == "Temperate") %>%
   group_by(year, mean_sst) %>%
   summarise(mean_species_richness = mean(species_richness, na.rm = TRUE), .groups = "drop") %>%
   ungroup()
-
-temp_data %>%
-  ggplot(aes(x = mean_sst, y = mean_species_richness, colour = mean_species_richness)) + 
-  geom_jitter(alpha = 0.7) + 
-  geom_smooth(method = "lm", se = TRUE, color = "blue") + 
-  scale_color_viridis(option = "D") +
-  facet_wrap(~year, scales = "free_x") +  # Facet wrap for selected years
-  labs(x = "Mean SST°C", 
-       y = "Average Species Richness", 
-       title = "Temperate (10-20°C)",
-       caption = paste0(
-         "SST % Change: ", round(change$percentage_change_sst, 2), "%\n",
-         "Species Richness % Change: ", round(change$percentage_change_richness, 2), "%\n",
-         "p-value = <0.05")) +
-  theme_bw() +
-  theme(axis.text.x = element_text(hjust = 1, size = 18),
-        text = element_text(size = 18),
-        axis.title = element_text(size = 25),
-        plot.title = element_text(hjust = 0.5, size = 30),
-        plot.caption = element_text(hjust = 1, vjust = 15, size = 20),
-        legend.position = "none")
 
 # Filter for SST 0-20°C
 temp_data_0_20 <- temp_data %>%
@@ -243,7 +233,6 @@ temp_data_25_30 <- temp_data %>%
   filter(mean_sst >= 25 & mean_sst <= 30) %>%
   rename(sst25 = mean_sst, msr25 = mean_species_richness)
 
-## STOPS WORKING HERE
 # Combine the two datasets
 combined_temp_data <- temp_data_0_20 %>%
   full_join(temp_data_25_30, by = "year")
@@ -260,31 +249,32 @@ last_year <- max(all_long$year)
 
 # Filter for every 5 years, including the first and last year
 temperate_20 <- all_long %>%
-  filter(range == "10-20°C") %>%
-  filter(year %% 5 == 0 | year == first_year | year == last_year)
+  filter(range == "10-20°C") #%>% filter(year %% 5 == 0 | year == first_year | year == last_year)
 
 # Plot with facets for the filtered years
-temperate_20 %>%
+temp_20plot <- temperate_20 %>%
   drop_na(sst) %>%
   ggplot(aes(x = sst, y = msr, colour = msr)) + 
   geom_jitter(alpha = 0.7) + 
   geom_smooth(method = "lm", se = TRUE, color = "blue") + 
   scale_color_viridis(option = "D") +
-  facet_wrap(~year, scales = "free_x") +  # Facet wrap for selected years
+  facet_wrap(~year, scales = "free") +  # Facet wrap for selected years
   labs(x = "Mean SST°C", 
        y = "Average Species Richness", 
        title = "Temperate (10-20°C)",
        caption = paste0(
          "SST % Change: ", round(change$percentage_change_sst, 2), "%\n",
          "Species Richness % Change: ", round(change$percentage_change_richness, 2), "%\n",
-         "p-value = <0.05")) +
+         "p-value = < 0.05")) +
   theme_bw() +
-  theme(axis.text.x = element_text(hjust = 1, size = 18),
-    text = element_text(size = 18),
-    axis.title = element_text(size = 25),
-    plot.title = element_text(hjust = 0.5, size = 30),
-    plot.caption = element_text(hjust = 1, vjust = 15, size = 20),
-    legend.position = "none") #+ ggsave("figures/temperate10_20c.png", width = 20, height = 10, dpi = 300)
+  theme(axis.text.x = element_text(hjust = 1, size = 16, angle = 35),
+        text = element_text(size = 18),
+        axis.title = element_text(size = 25),
+        axis.text.y = element_text(size = 18),
+        plot.title = element_text(hjust = 0, size = 35, face = "bold"),
+        plot.caption = element_text(hjust = 1, vjust = 5, size = 20),
+        legend.position = "none",
+        strip.text = element_text(size = 18, face = "bold"))
 
 change <- temp_data_0_20 %>%
   summarise(
@@ -296,38 +286,45 @@ change <- temp_data_0_20 %>%
          change_richness = last_year_richness - first_year_richness,
          percentage_change_sst = round((change_sst / first_year_sst) * 100, 2),
          percentage_change_richness = round((change_richness / first_year_richness) * 100, 2))
-
 ## change in sst  1.51% increase
 # change richness -0.14% decreaae # bc of data ditribution 
 
+lm_model20 <- lm(msr20 ~ sst20, data = temp_data_0_20)
+summary(lm_model20)
+
 ## 25 - 30 C
-
-# instead of filtering by how many years to show, i want to only show the plots with more than 10 observations
 temperate_25 <- all_long %>%
-  filter(range == "25-30°C")%>%
-  filter(year %% 3 == 0 | year == first_year | year == last_year) 
+  filter(range == "25-30°C")
+# filter(year %% 3 == 0 | year == first_year | year == last_year) 
 
-temperate_25 %>%
+temperate_25 <- all_long %>%
+  filter(range == "25-30°C",
+         !(year == 1966 | (year >= 1970 & year <= 1972) | (year >= 1988 & year <= 1993) | 
+             (year >= 1995 & year <= 2000)))
+
+temp25_plot <- temperate_25 %>%
   drop_na(sst) %>%
   ggplot(aes(x = sst, y = msr, colour = msr)) + 
   geom_jitter(alpha = 0.7) + 
   geom_smooth(method = "lm", se = TRUE, color = "blue") + 
   scale_color_viridis(option = "D") +
-  facet_wrap(~year, scales = "free") +  # Facet wrap for selected years
+  facet_wrap(~year, scales = "free") + 
   labs(x = "Mean SST°C", 
        y = "Average Species Richness", 
        title = "Temperate (25-30°C)",
        caption = paste0(
          "SST % Change: ", round(change25$percentage_change_sst, 2), "%\n",
          "Species Richness % Change: ", round(change25$percentage_change_richness, 2), "%\n",
-         "p-value = <0.05")) +
+         "p-value = > 0.05")) +
   theme_bw() +
-  theme(axis.text.x = element_text(hjust = 1, size = 18),
+  theme(axis.text.x = element_text(hjust = 1, size = 16, angle = 35),
         text = element_text(size = 18),
         axis.title = element_text(size = 25),
-        plot.title = element_text(hjust = 0.5, size = 30),
-        plot.caption = element_text(hjust = 1, vjust = 10, size = 20),
-        legend.position = "none") #+ ggsave("figures/temperate25_30c.png", width = 20, height = 10, dpi = 300)
+        axis.text.y = element_text(size = 18),
+        plot.title = element_text(hjust = 0, size = 35, face = "bold"),
+        plot.caption = element_text(hjust = 1, vjust = 5, size = 20),
+        legend.position = "none",
+        strip.text = element_text(size = 18, face = "bold"))
 
 change25 <- temp_data_25_30 %>%
   summarise(
@@ -341,5 +338,16 @@ change25 <- temp_data_25_30 %>%
          percentage_change_richness = round((change_richness / first_year_richness) * 100, 2))
 
 lm_model25 <- lm(msr25 ~ sst25, data = temp_data_25_30)
-summary(lm_model)
+summary(lm_model25)
 
+# combined plots 
+library(patchwork)
+temp_20plot
+temp25_plot
+trop_plot
+
+combined <- trop_plot/(temp_20plot | temp25_plot) + 
+  plot_annotation(tag_levels = 'a') & 
+  theme(plot.tag = element_text(size = 35, face = "bold"))
+
+ggsave("figures/combinedplotFINAL.png", combined, width = 45, height = 25, units = "in", dpi = 300)
